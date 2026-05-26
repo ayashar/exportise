@@ -58,4 +58,23 @@ void main() {
 
     expect(find.text('Analisis Sentimen'), findsOneWidget);
   });
+
+  testWidgets('History page shows downloadable reference and result tabs', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const MyApp());
+
+    await tester.tap(find.text('Laporanku'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Referensi'), findsOneWidget);
+    expect(find.text('Variasi A'), findsOneWidget);
+    expect(find.text('Unduh'), findsWidgets);
+
+    await tester.tap(find.text('Hasil'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('The Manhattan Circle'), findsOneWidget);
+    expect(find.text('Unduh JPG'), findsOneWidget);
+  });
 }

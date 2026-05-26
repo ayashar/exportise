@@ -1,0 +1,3 @@
+export 'asset_downloader_stub.dart'
+    if (dart.library.io) 'asset_downloader_io.dart'
+    if (dart.library.html) 'asset_downloader_web.dart';

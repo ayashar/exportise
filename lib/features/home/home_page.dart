@@ -6,6 +6,7 @@ import '../../core/theme/app_typography.dart';
 import '../../shared/widgets/app_bottom_navigation.dart';
 import '../../shared/widgets/app_button.dart';
 import '../analysis/analysis_input_page.dart';
+import '../reports/history_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -60,6 +61,9 @@ class HomePage extends StatelessWidget {
                   if (tab == AppTab.analysis) {
                     _openAnalysis(context);
                   }
+                  if (tab == AppTab.reports) {
+                    _openReports(context);
+                  }
                 },
               ),
             ),
@@ -74,6 +78,12 @@ void _openAnalysis(BuildContext context) {
   Navigator.of(context).push(
     MaterialPageRoute<void>(builder: (context) => const AnalysisInputPage()),
   );
+}
+
+void _openReports(BuildContext context) {
+  Navigator.of(
+    context,
+  ).push(MaterialPageRoute<void>(builder: (context) => const HistoryPage()));
 }
 
 class _HomeHeader extends StatelessWidget {

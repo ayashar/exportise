@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../shared/widgets/app_bottom_navigation.dart';
 import '../../shared/widgets/app_button.dart';
+import '../reports/history_page.dart';
 import 'design_reference_page.dart';
 
 class AnalysisResultPage extends StatefulWidget {
@@ -113,6 +114,13 @@ class _AnalysisResultPageState extends State<AnalysisResultPage> {
                 onTabSelected: (tab) {
                   if (tab == AppTab.home) {
                     Navigator.of(context).popUntil((route) => route.isFirst);
+                  }
+                  if (tab == AppTab.reports) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (context) => const HistoryPage(),
+                      ),
+                    );
                   }
                 },
               ),

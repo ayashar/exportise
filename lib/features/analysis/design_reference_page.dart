@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../shared/widgets/app_bottom_navigation.dart';
 import '../../shared/widgets/app_button.dart';
+import '../reports/history_page.dart';
 
 class DesignReferencePage extends StatelessWidget {
   const DesignReferencePage({super.key});
@@ -65,6 +66,13 @@ class DesignReferencePage extends StatelessWidget {
                 onTabSelected: (tab) {
                   if (tab == AppTab.home) {
                     Navigator.of(context).popUntil((route) => route.isFirst);
+                  }
+                  if (tab == AppTab.reports) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (context) => const HistoryPage(),
+                      ),
+                    );
                   }
                 },
               ),
