@@ -6,6 +6,8 @@ import '../../core/theme/app_typography.dart';
 import '../../shared/widgets/app_bottom_navigation.dart';
 import '../../shared/widgets/app_button.dart';
 import '../analysis/analysis_input_page.dart';
+import '../notifications/notification_page.dart';
+import '../profile/profile_page.dart';
 import '../reports/history_page.dart';
 
 class HomePage extends StatelessWidget {
@@ -93,45 +95,69 @@ class _HomeHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const CircleAvatar(
-          radius: 24,
-          backgroundImage: AssetImage('assets/images/home/profile.png'),
+        InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: () => _openProfile(context),
+          child: const CircleAvatar(
+            radius: 24,
+            backgroundImage: AssetImage('assets/images/home/profile.png'),
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: Text(
-            'Arunika Tas',
-            style: AppTypography.headlineSm.copyWith(
-              color: AppColors.neutral09,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => _openProfile(context),
+            child: Text(
+              'Arunika Tas',
+              style: AppTypography.headlineSm.copyWith(
+                color: AppColors.neutral09,
+              ),
             ),
           ),
         ),
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: AppColors.system01,
-            shape: BoxShape.circle,
-            border: Border.all(color: AppColors.neutral03),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x1A7A5900),
-                blurRadius: 18,
-                offset: Offset(0, 8),
+        InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: () => _openNotifications(context),
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.system01,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.neutral03),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x1A7A5900),
+                  blurRadius: 18,
+                  offset: Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Center(
+              child: AppIcon(
+                AppIcons.bell(),
+                color: AppColors.primary05,
+                dimension: 22,
               ),
-            ],
-          ),
-          child: Center(
-            child: AppIcon(
-              AppIcons.bell(),
-              color: AppColors.primary05,
-              dimension: 22,
             ),
           ),
         ),
       ],
     );
   }
+}
+
+void _openProfile(BuildContext context) {
+  Navigator.of(
+    context,
+  ).push(MaterialPageRoute<void>(builder: (context) => const ProfilePage()));
+}
+
+void _openNotifications(BuildContext context) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(builder: (context) => const NotificationPage()),
+  );
 }
 
 class _Greeting extends StatelessWidget {

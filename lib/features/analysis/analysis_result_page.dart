@@ -5,6 +5,8 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../shared/widgets/app_bottom_navigation.dart';
 import '../../shared/widgets/app_button.dart';
+import '../notifications/notification_page.dart';
+import '../profile/profile_page.dart';
 import '../reports/history_page.dart';
 import 'design_reference_page.dart';
 
@@ -231,21 +233,32 @@ class _ResultHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const CircleAvatar(
-          radius: 22,
-          backgroundImage: AssetImage('assets/images/home/profile.png'),
+        InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: () => _openProfile(context),
+          child: const CircleAvatar(
+            radius: 22,
+            backgroundImage: AssetImage('assets/images/home/profile.png'),
+          ),
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: Text(
-            'Arunika Tas',
-            style: AppTypography.bodyMd.copyWith(
-              color: AppColors.neutral09,
-              fontWeight: FontWeight.w700,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => _openProfile(context),
+            child: Text(
+              'Arunika Tas',
+              style: AppTypography.bodyMd.copyWith(
+                color: AppColors.neutral09,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ),
-        _CircleIconButton(icon: AppIcons.bell()),
+        _CircleIconButton(
+          icon: AppIcons.bell(),
+          onTap: () => _openNotifications(context),
+        ),
         const SizedBox(width: 12),
         _CircleIconButton(icon: AppIcons.download()),
       ],
@@ -254,25 +267,42 @@ class _ResultHeader extends StatelessWidget {
 }
 
 class _CircleIconButton extends StatelessWidget {
-  const _CircleIconButton({required this.icon});
+  const _CircleIconButton({required this.icon, this.onTap});
 
   final IconData icon;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: AppColors.system01,
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.neutral03),
-      ),
-      child: Center(
-        child: AppIcon(icon, color: AppColors.primary05, dimension: 18),
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: AppColors.system01,
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.neutral03),
+        ),
+        child: Center(
+          child: AppIcon(icon, color: AppColors.primary05, dimension: 18),
+        ),
       ),
     );
   }
+}
+
+void _openProfile(BuildContext context) {
+  Navigator.of(
+    context,
+  ).push(MaterialPageRoute<void>(builder: (context) => const ProfilePage()));
+}
+
+void _openNotifications(BuildContext context) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(builder: (context) => const NotificationPage()),
+  );
 }
 
 class _RecommendationCard extends StatelessWidget {

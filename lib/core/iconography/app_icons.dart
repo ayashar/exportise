@@ -45,6 +45,18 @@ abstract final class AppIcons {
     PhosphorIconsStyle style = PhosphorIconsStyle.regular,
   ]) => PhosphorIcons.fileText(style);
 
+  static PhosphorIconData edit([
+    PhosphorIconsStyle style = PhosphorIconsStyle.regular,
+  ]) => PhosphorIcons.pencilSimple(style);
+
+  static PhosphorIconData eye([
+    PhosphorIconsStyle style = PhosphorIconsStyle.regular,
+  ]) => PhosphorIcons.eye(style);
+
+  static PhosphorIconData filePdf([
+    PhosphorIconsStyle style = PhosphorIconsStyle.regular,
+  ]) => PhosphorIcons.filePdf(style);
+
   static PhosphorIconData download([
     PhosphorIconsStyle style = PhosphorIconsStyle.regular,
   ]) => PhosphorIcons.downloadSimple(style);

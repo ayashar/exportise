@@ -1,5 +1,7 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:eksportise_frontend/core/iconography/app_icons.dart';
 import 'package:eksportise_frontend/main.dart';
 
 void main() {
@@ -76,5 +78,33 @@ void main() {
 
     expect(find.text('The Manhattan Circle'), findsOneWidget);
     expect(find.text('Unduh JPG'), findsOneWidget);
+  });
+
+  testWidgets('Header profile and notification navigation works', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const MyApp());
+
+    await tester.tap(find.text('Arunika Tas').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Informasi Akun'), findsOneWidget);
+    expect(find.text('Informasi UMKM'), findsOneWidget);
+
+    await tester.tap(find.text('Ubah Profile'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Konfirmasi Password'), findsOneWidget);
+    expect(find.text('Simpan Perubahan'), findsOneWidget);
+
+    Navigator.of(tester.element(find.text('Informasi Akun'))).pop();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(AppIcons.bell()).first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Hari ini'), findsOneWidget);
+    expect(find.text('Laporan Tas Anyaman\nAmerika Serikat'), findsWidgets);
+    expect(find.text('Unduh PDF'), findsWidgets);
   });
 }
