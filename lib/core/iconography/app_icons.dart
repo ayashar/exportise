@@ -13,6 +13,14 @@ abstract final class AppIcons {
     PhosphorIconsStyle style = PhosphorIconsStyle.regular,
   ]) => PhosphorIcons.arrowRight(style);
 
+  static PhosphorIconData bell([
+    PhosphorIconsStyle style = PhosphorIconsStyle.regular,
+  ]) => PhosphorIcons.bell(style);
+
+  static PhosphorIconData brain([
+    PhosphorIconsStyle style = PhosphorIconsStyle.regular,
+  ]) => PhosphorIcons.brain(style);
+
   static PhosphorIconData check([
     PhosphorIconsStyle style = PhosphorIconsStyle.regular,
   ]) => PhosphorIcons.check(style);
@@ -20,6 +28,14 @@ abstract final class AppIcons {
   static PhosphorIconData close([
     PhosphorIconsStyle style = PhosphorIconsStyle.regular,
   ]) => PhosphorIcons.x(style);
+
+  static PhosphorIconData document([
+    PhosphorIconsStyle style = PhosphorIconsStyle.regular,
+  ]) => PhosphorIcons.fileText(style);
+
+  static PhosphorIconData gear([
+    PhosphorIconsStyle style = PhosphorIconsStyle.regular,
+  ]) => PhosphorIcons.gearSix(style);
 
   static PhosphorIconData home([
     PhosphorIconsStyle style = PhosphorIconsStyle.regular,
@@ -32,6 +48,10 @@ abstract final class AppIcons {
   static PhosphorIconData search([
     PhosphorIconsStyle style = PhosphorIconsStyle.regular,
   ]) => PhosphorIcons.magnifyingGlass(style);
+
+  static PhosphorIconData trendUp([
+    PhosphorIconsStyle style = PhosphorIconsStyle.regular,
+  ]) => PhosphorIcons.chartLineUp(style);
 
   static PhosphorIconData user([
     PhosphorIconsStyle style = PhosphorIconsStyle.regular,
