@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../../core/iconography/app_icons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
+import '../../shared/widgets/app_bottom_navigation.dart';
 import '../../shared/widgets/app_button.dart';
+import '../analysis/analysis_input_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -19,28 +21,28 @@ class HomePage extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(18, 28, 18, 118),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  _HomeHeader(),
-                  SizedBox(height: 34),
-                  _Greeting(),
-                  SizedBox(height: 30),
-                  _ExporterLevelCard(),
-                  SizedBox(height: 26),
+                children: [
+                  const _HomeHeader(),
+                  const SizedBox(height: 34),
+                  const _Greeting(),
+                  const SizedBox(height: 30),
+                  const _ExporterLevelCard(),
+                  const SizedBox(height: 26),
                   _InsightCard(),
-                  SizedBox(height: 32),
+                  const SizedBox(height: 32),
                   _QuickActionGrid(),
-                  SizedBox(height: 34),
-                  _SectionHeader(),
-                  SizedBox(height: 16),
-                  _AnalysisCard(
+                  const SizedBox(height: 34),
+                  const _SectionHeader(),
+                  const SizedBox(height: 16),
+                  const _AnalysisCard(
                     imagePath: 'assets/images/home/woven_bag.png',
                     title: 'Tas Anyaman',
                     country: 'Amerika Serikat',
                     status: 'Siap Ekspor',
                     statusColor: AppColors.tertiary02,
                   ),
-                  SizedBox(height: 16),
-                  _AnalysisCard(
+                  const SizedBox(height: 16),
+                  const _AnalysisCard(
                     imagePath: 'assets/images/home/coffee_jacket.png',
                     title: 'Kopi Luwak',
                     country: 'Jepang',
@@ -50,15 +52,28 @@ class HomePage extends StatelessWidget {
                 ],
               ),
             ),
-            const Align(
+            Align(
               alignment: Alignment.bottomCenter,
-              child: _BottomNavigation(),
+              child: AppBottomNavigation(
+                selectedTab: AppTab.home,
+                onTabSelected: (tab) {
+                  if (tab == AppTab.analysis) {
+                    _openAnalysis(context);
+                  }
+                },
+              ),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+void _openAnalysis(BuildContext context) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(builder: (context) => const AnalysisInputPage()),
+  );
 }
 
 class _HomeHeader extends StatelessWidget {
@@ -234,7 +249,7 @@ class _InsightCard extends StatelessWidget {
                 AppButton(
                   label: 'Analisis sekarang',
                   size: AppButtonSize.sm,
-                  onPressed: () {},
+                  onPressed: () => _openAnalysis(context),
                 ),
               ],
             ),
@@ -250,24 +265,25 @@ class _QuickActionGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    return Row(
       children: [
         Expanded(
           child: _QuickActionTile(
             icon: _QuickActionIcon.analysis,
             label: 'Analisis\nProduk',
             isActive: true,
+            onTap: () => _openAnalysis(context),
           ),
         ),
-        SizedBox(width: 10),
-        Expanded(
+        const SizedBox(width: 10),
+        const Expanded(
           child: _QuickActionTile(
             icon: _QuickActionIcon.brain,
             label: 'Brain Studio',
           ),
         ),
-        SizedBox(width: 10),
-        Expanded(
+        const SizedBox(width: 10),
+        const Expanded(
           child: _QuickActionTile(
             icon: _QuickActionIcon.report,
             label: 'LaporanKu',
@@ -283,11 +299,13 @@ class _QuickActionTile extends StatelessWidget {
     required this.icon,
     required this.label,
     this.isActive = false,
+    this.onTap,
   });
 
   final _QuickActionIcon icon;
   final bool isActive;
   final String label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -296,37 +314,41 @@ class _QuickActionTile extends StatelessWidget {
         ? AppColors.primary08
         : AppColors.neutral08;
 
-    return Container(
-      height: 112,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 18),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x147A5900),
-            blurRadius: 24,
-            offset: Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          AppIcon(icon.data, color: foregroundColor, dimension: 24),
-          const Spacer(),
-          Text(
-            label,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: AppTypography.bodySm.copyWith(
-              color: foregroundColor,
-              fontWeight: FontWeight.w600,
-              height: 1.08,
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: Container(
+        height: 112,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 18),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x147A5900),
+              blurRadius: 24,
+              offset: Offset(0, 12),
             ),
-          ),
-        ],
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AppIcon(icon.data, color: foregroundColor, dimension: 24),
+            const Spacer(),
+            Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: AppTypography.bodySm.copyWith(
+                color: foregroundColor,
+                fontWeight: FontWeight.w600,
+                height: 1.08,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -473,93 +495,6 @@ class _AnalysisCard extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-class _BottomNavigation extends StatelessWidget {
-  const _BottomNavigation();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-      child: Container(
-        height: 64,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        decoration: BoxDecoration(
-          color: AppColors.neutral01,
-          borderRadius: BorderRadius.circular(32),
-          border: Border.all(color: AppColors.secondary08),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x147A5900),
-              blurRadius: 18,
-              offset: Offset(0, 8),
-            ),
-          ],
-        ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _BottomNavItem(
-              icon: _BottomNavIcon.home,
-              label: 'Home',
-              active: true,
-            ),
-            _BottomNavItem(icon: _BottomNavIcon.analysis, label: 'Analisis'),
-            _BottomNavItem(icon: _BottomNavIcon.brain, label: 'BrainS'),
-            _BottomNavItem(icon: _BottomNavIcon.report, label: 'Laporanku'),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _BottomNavItem extends StatelessWidget {
-  const _BottomNavItem({
-    required this.icon,
-    required this.label,
-    this.active = false,
-  });
-
-  final bool active;
-  final _BottomNavIcon icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = active ? AppColors.secondary04 : AppColors.primary06;
-
-    return SizedBox(
-      width: 70,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          AppIcon(icon.data, color: color, dimension: 22),
-          const SizedBox(height: 3),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTypography.bodySm.copyWith(color: color, fontSize: 12),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-enum _BottomNavIcon { home, analysis, brain, report }
-
-extension on _BottomNavIcon {
-  IconData get data {
-    return switch (this) {
-      _BottomNavIcon.home => AppIcons.home(),
-      _BottomNavIcon.analysis => AppIcons.trendUp(),
-      _BottomNavIcon.brain => AppIcons.brain(),
-      _BottomNavIcon.report => AppIcons.document(),
-    };
   }
 }
 
