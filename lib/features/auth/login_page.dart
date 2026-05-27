@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/iconography/app_icons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
+import '../../shared/widgets/app_dropdown_field.dart';
 import '../home/home_page.dart';
 import 'register_page.dart';
 
@@ -253,53 +254,12 @@ class AuthDropdownField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: AppTypography.bodySm.copyWith(
-            color: AppColors.neutral08,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          initialValue: value,
-          decoration: InputDecoration(
-            hintText: hintText,
-            hintStyle: AppTypography.bodySm.copyWith(color: AppColors.system05),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 14,
-            ),
-            filled: true,
-            fillColor: value == null
-                ? AppColors.tertiary05
-                : AppColors.system01,
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppColors.tertiary06),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppColors.primary04),
-            ),
-          ),
-          icon: AppIcon(
-            AppIcons.dropdown(),
-            color: AppColors.system06,
-            dimension: 16,
-          ),
-          items: items
-              .map((item) => DropdownMenuItem(value: item, child: Text(item)))
-              .toList(),
-          onChanged: onChanged,
-          style: AppTypography.bodySm.copyWith(color: AppColors.neutral08),
-        ),
-      ],
+    return AppDropdownField(
+      hintText: hintText,
+      items: items,
+      label: label,
+      onChanged: onChanged,
+      value: value,
     );
   }
 }

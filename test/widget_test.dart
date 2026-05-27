@@ -5,6 +5,38 @@ import 'package:eksportise_frontend/core/iconography/app_icons.dart';
 import 'package:eksportise_frontend/main.dart';
 
 void main() {
+  testWidgets('Onboarding flow appears before auth', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const MyApp());
+
+    expect(
+      find.text('Produkmu bisa laku di\nAmerika, Eropa, Jepang'),
+      findsOneWidget,
+    );
+    expect(find.text('Selanjutnya'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Selanjutnya'));
+    await tester.tap(find.text('Selanjutnya'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cerita dulu tentang\nprodukmu'), findsOneWidget);
+    expect(find.text('Belum Pernah'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Selanjutnya'));
+    await tester.tap(find.text('Selanjutnya'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Coba sekarang'), findsOneWidget);
+    expect(find.text('Coba Analisis'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Coba Analisis'));
+    await tester.tap(find.text('Coba Analisis'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Selamat Datang!'), findsOneWidget);
+  });
+
   testWidgets('Home page smoke test', (WidgetTester tester) async {
     await _openHome(tester);
 
@@ -161,7 +193,7 @@ void main() {
   testWidgets('Login and register screens render auth flow', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const MyApp());
+    await _openLogin(tester);
 
     expect(find.text('Selamat Datang!'), findsOneWidget);
     expect(find.text('Masuk'), findsOneWidget);
@@ -183,7 +215,14 @@ void main() {
 }
 
 Future<void> _openHome(WidgetTester tester) async {
-  await tester.pumpWidget(const MyApp());
+  await _openLogin(tester);
   await tester.tap(find.text('Masuk'));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openLogin(WidgetTester tester) async {
+  await tester.pumpWidget(const MyApp());
+  await tester.ensureVisible(find.text('Lewati'));
+  await tester.tap(find.text('Lewati'));
   await tester.pumpAndSettle();
 }

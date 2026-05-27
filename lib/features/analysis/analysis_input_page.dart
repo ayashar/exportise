@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../shared/widgets/app_bottom_navigation.dart';
 import '../../shared/widgets/app_button.dart';
+import '../../shared/widgets/app_dropdown_field.dart';
 import '../brains/brain_studio_page.dart';
 import '../notifications/notification_page.dart';
 import '../profile/profile_page.dart';
@@ -254,25 +255,12 @@ class _CategoryDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonFormField<String>(
-      initialValue: value,
-      borderRadius: BorderRadius.circular(8),
-      decoration: _fieldDecoration('Pilih Kategori'),
-      dropdownColor: AppColors.system01,
-      icon: AppIcon(
-        AppIcons.dropdown(),
-        color: AppColors.system06,
-        dimension: 18,
-      ),
-      items: const [
-        DropdownMenuItem(
-          value: 'Kerajinan Tangan',
-          child: Text('Kerajinan Tangan'),
-        ),
-        DropdownMenuItem(value: 'Pakaian', child: Text('Pakaian')),
-      ],
+    return AppDropdownField(
+      hintText: 'Pilih Kategori',
+      items: const ['Kerajinan Tangan', 'Pakaian'],
       onChanged: onChanged,
-      style: AppTypography.bodyMd.copyWith(color: AppColors.neutral09),
+      textStyle: AppTypography.bodyMd.copyWith(color: AppColors.neutral09),
+      value: value,
     );
   }
 }

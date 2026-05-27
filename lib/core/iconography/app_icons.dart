@@ -105,6 +105,14 @@ abstract final class AppIcons {
     PhosphorIconsStyle style = PhosphorIconsStyle.regular,
   ]) => PhosphorIcons.magnifyingGlass(style);
 
+  static PhosphorIconData smiley([
+    PhosphorIconsStyle style = PhosphorIconsStyle.regular,
+  ]) => PhosphorIcons.smiley(style);
+
+  static PhosphorIconData rocket([
+    PhosphorIconsStyle style = PhosphorIconsStyle.regular,
+  ]) => PhosphorIcons.rocketLaunch(style);
+
   static PhosphorIconData season([
     PhosphorIconsStyle style = PhosphorIconsStyle.regular,
   ]) => PhosphorIcons.calendarCheck(style);

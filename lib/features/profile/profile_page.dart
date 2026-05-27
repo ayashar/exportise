@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../shared/widgets/app_bottom_navigation.dart';
 import '../../shared/widgets/app_button.dart';
+import '../../shared/widgets/app_dropdown_field.dart';
 import '../analysis/analysis_input_page.dart';
 import '../auth/login_page.dart';
 import '../brains/brain_studio_page.dart';
@@ -20,6 +21,9 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   bool _isEditing = false;
+  String _city = 'Sleman';
+  String _district = 'Mlati';
+  String _province = 'DI Yogyakarta';
 
   @override
   Widget build(BuildContext context) {
@@ -82,27 +86,57 @@ class _ProfilePageState extends State<ProfilePage> {
                         value: 'Arunika Tas',
                       ),
                       const SizedBox(height: 20),
-                      const _ProfileTextField(
+                      _ProfileDropdownField(
                         label: 'Provinsi',
-                        value: 'DI Yogyakarta',
-                        dropdown: true,
+                        value: _province,
+                        items: const [
+                          'DI Yogyakarta',
+                          'Jawa Timur',
+                          'Sumatera Utara',
+                          'Sulawesi Selatan',
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => _province = value);
+                          }
+                        },
                       ),
                       const SizedBox(height: 20),
-                      const Row(
+                      Row(
                         children: [
                           Expanded(
-                            child: _ProfileTextField(
+                            child: _ProfileDropdownField(
                               label: 'Kota/Kabupaten',
-                              value: 'Sleman',
-                              dropdown: true,
+                              value: _city,
+                              items: const [
+                                'Sleman',
+                                'Bantul',
+                                'Yogyakarta',
+                                'Surabaya',
+                              ],
+                              onChanged: (value) {
+                                if (value != null) {
+                                  setState(() => _city = value);
+                                }
+                              },
                             ),
                           ),
-                          SizedBox(width: 10),
+                          const SizedBox(width: 10),
                           Expanded(
-                            child: _ProfileTextField(
+                            child: _ProfileDropdownField(
                               label: 'Kecamatan',
-                              value: 'Mlati',
-                              dropdown: true,
+                              value: _district,
+                              items: const [
+                                'Mlati',
+                                'Berbah',
+                                'Depok',
+                                'Gamping',
+                              ],
+                              onChanged: (value) {
+                                if (value != null) {
+                                  setState(() => _district = value);
+                                }
+                              },
                             ),
                           ),
                         ],
@@ -197,6 +231,39 @@ class _ProfilePageState extends State<ProfilePage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ProfileDropdownField extends StatelessWidget {
+  const _ProfileDropdownField({
+    required this.items,
+    required this.label,
+    required this.onChanged,
+    required this.value,
+  });
+
+  final List<String> items;
+  final String label;
+  final ValueChanged<String?> onChanged;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppDropdownField(
+      fillColor: AppColors.tertiary05,
+      height: 44,
+      hintText: label,
+      itemHeight: 46,
+      items: items,
+      label: label,
+      labelStyle: AppTypography.bodyMd.copyWith(
+        color: AppColors.neutral08,
+        fontWeight: FontWeight.w700,
+      ),
+      onChanged: onChanged,
+      textStyle: AppTypography.bodySm.copyWith(color: AppColors.neutral08),
+      value: value,
     );
   }
 }
@@ -388,11 +455,9 @@ class _ProfileTextField extends StatelessWidget {
   const _ProfileTextField({
     required this.label,
     required this.value,
-    this.dropdown = false,
     this.obscureAction = false,
   });
 
-  final bool dropdown;
   final String label;
   final bool obscureAction;
   final String value;
@@ -439,12 +504,6 @@ class _ProfileTextField extends StatelessWidget {
                   ),
                 ),
               ),
-              if (dropdown)
-                AppIcon(
-                  AppIcons.dropdown(),
-                  color: AppColors.system06,
-                  dimension: 16,
-                ),
               if (obscureAction)
                 AppIcon(
                   AppIcons.eye(),
