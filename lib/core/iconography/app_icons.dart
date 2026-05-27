@@ -9,6 +9,10 @@ abstract final class AppIcons {
     PhosphorIconsStyle style = PhosphorIconsStyle.regular,
   ]) => PhosphorIcons.plus(style);
 
+  static PhosphorIconData addCircle([
+    PhosphorIconsStyle style = PhosphorIconsStyle.regular,
+  ]) => PhosphorIcons.plusCircle(style);
+
   static PhosphorIconData arrowRight([
     PhosphorIconsStyle style = PhosphorIconsStyle.regular,
   ]) => PhosphorIcons.arrowRight(style);
@@ -76,6 +80,14 @@ abstract final class AppIcons {
   static PhosphorIconData package([
     PhosphorIconsStyle style = PhosphorIconsStyle.regular,
   ]) => PhosphorIcons.package(style);
+
+  static PhosphorIconData mic([
+    PhosphorIconsStyle style = PhosphorIconsStyle.regular,
+  ]) => PhosphorIcons.microphone(style);
+
+  static PhosphorIconData send([
+    PhosphorIconsStyle style = PhosphorIconsStyle.regular,
+  ]) => PhosphorIcons.paperPlaneTilt(style);
 
   static PhosphorIconData search([
     PhosphorIconsStyle style = PhosphorIconsStyle.regular,

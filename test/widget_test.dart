@@ -107,4 +107,40 @@ void main() {
     expect(find.text('Laporan Tas Anyaman\nAmerika Serikat'), findsWidgets);
     expect(find.text('Unduh PDF'), findsWidgets);
   });
+
+  testWidgets('BrainS bottom nav opens fresh BrainStudio conversation', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const MyApp());
+
+    await tester.tap(find.text('BrainS'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('BrainStudio'), findsWidgets);
+    expect(find.textContaining('Saya ingin mendesain koleksi'), findsOneWidget);
+    expect(find.text('Eco-Utility Essential'), findsWidgets);
+  });
+
+  testWidgets('Design reference discussion opens contextual chatbot', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const MyApp());
+
+    await tester.tap(find.text('Analisis sekarang'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Analisis Market'));
+    await tester.tap(find.text('Analisis Market'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Referensi Desain'));
+    await tester.tap(find.text('Referensi Desain'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Diskusi').first);
+    await tester.tap(find.text('Diskusi').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('BrainStudio'), findsWidgets);
+    expect(find.textContaining('Hai Arunika Tas'), findsOneWidget);
+    expect(find.text('The Manhattan\nCircle'), findsOneWidget);
+  });
 }

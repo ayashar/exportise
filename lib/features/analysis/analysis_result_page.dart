@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../shared/widgets/app_bottom_navigation.dart';
 import '../../shared/widgets/app_button.dart';
+import '../brains/brain_studio_page.dart';
 import '../notifications/notification_page.dart';
 import '../profile/profile_page.dart';
 import '../reports/history_page.dart';
@@ -121,6 +122,13 @@ class _AnalysisResultPageState extends State<AnalysisResultPage> {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (context) => const HistoryPage(),
+                      ),
+                    );
+                  }
+                  if (tab == AppTab.brains) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (context) => const BrainStudioPage.fresh(),
                       ),
                     );
                   }
@@ -486,7 +494,7 @@ class _BrainsAdvice extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Saran BrainS',
+                  'Saran BrainStudio',
                   style: AppTypography.bodySm.copyWith(
                     color: AppColors.neutral08,
                     fontWeight: FontWeight.w700,

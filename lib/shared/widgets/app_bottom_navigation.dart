@@ -90,7 +90,7 @@ class _BottomNavItem extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       onTap: onTap,
       child: SizedBox(
-        width: 70,
+        width: 76,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -100,7 +100,10 @@ class _BottomNavItem extends StatelessWidget {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: AppTypography.bodySm.copyWith(color: color, fontSize: 12),
+              style: AppTypography.bodySm.copyWith(
+                color: color,
+                fontSize: label.length > 8 ? 10 : 12,
+              ),
             ),
           ],
         ),

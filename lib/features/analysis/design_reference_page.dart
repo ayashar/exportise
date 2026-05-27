@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../shared/widgets/app_bottom_navigation.dart';
 import '../../shared/widgets/app_button.dart';
+import '../brains/brain_studio_page.dart';
 import '../notifications/notification_page.dart';
 import '../profile/profile_page.dart';
 import '../reports/history_page.dart';
@@ -73,6 +74,13 @@ class DesignReferencePage extends StatelessWidget {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (context) => const HistoryPage(),
+                      ),
+                    );
+                  }
+                  if (tab == AppTab.brains) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (context) => const BrainStudioPage.fresh(),
                       ),
                     );
                   }
@@ -357,7 +365,14 @@ class _DesignReferenceCard extends StatelessWidget {
                       child: AppButton(
                         label: 'Diskusi',
                         leadingIcon: AppIcons.chat(),
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (context) =>
+                                  const BrainStudioPage.designReference(),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ],

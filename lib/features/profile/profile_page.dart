@@ -6,6 +6,7 @@ import '../../core/theme/app_typography.dart';
 import '../../shared/widgets/app_bottom_navigation.dart';
 import '../../shared/widgets/app_button.dart';
 import '../analysis/analysis_input_page.dart';
+import '../brains/brain_studio_page.dart';
 import '../notifications/notification_page.dart';
 import '../reports/history_page.dart';
 
@@ -165,6 +166,13 @@ class _ProfilePageState extends State<ProfilePage> {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (context) => const HistoryPage(),
+                      ),
+                    );
+                  }
+                  if (tab == AppTab.brains) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (context) => const BrainStudioPage.fresh(),
                       ),
                     );
                   }
