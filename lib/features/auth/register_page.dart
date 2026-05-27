@@ -132,7 +132,7 @@ class _RegisterPageState extends State<RegisterPage> {
         phone: _phoneController.text.trim(),
       );
 
-      if (!mounted) {
+      if (!context.mounted) {
         return;
       }
 
@@ -145,7 +145,7 @@ class _RegisterPageState extends State<RegisterPage> {
         (route) => false,
       );
     } on ApiException catch (error) {
-      if (!mounted) {
+      if (!context.mounted) {
         return;
       }
 
@@ -157,7 +157,7 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
       );
     } catch (_) {
-      if (!mounted) {
+      if (!context.mounted) {
         return;
       }
 

@@ -529,7 +529,7 @@ class _HistoryImage extends StatelessWidget {
         width: double.infinity,
         height: height,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) {
+        errorBuilder: (_, _, _) {
           return _FallbackHistoryImage(height: height);
         },
       );

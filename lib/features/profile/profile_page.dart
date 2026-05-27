@@ -274,7 +274,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
     try {
       await _repository.logout();
-      if (!mounted) {
+      if (!context.mounted) {
         return;
       }
 
@@ -283,7 +283,7 @@ class _ProfilePageState extends State<ProfilePage> {
         (route) => false,
       );
     } on ApiException catch (error) {
-      if (!mounted) {
+      if (!context.mounted) {
         return;
       }
 

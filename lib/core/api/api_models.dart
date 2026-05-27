@@ -233,7 +233,7 @@ String _string(Map<String, dynamic> json, String key) {
 
 String? _nullableString(Map<String, dynamic> json, String key) {
   final value = json[key];
-  return value == null ? null : value.toString();
+  return value?.toString();
 }
 
 DateTime? _dateTime(Map<String, dynamic> json, String key) {

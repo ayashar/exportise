@@ -163,9 +163,7 @@ class _BrainStudioPageState extends State<BrainStudioPage> {
 
     activeSession ??= sessions.isNotEmpty ? sessions.first : null;
 
-    if (activeSession == null) {
-      activeSession = await _createSessionInternal();
-    }
+    activeSession ??= await _createSessionInternal();
 
     final messages = await _repository.listMessages(activeSession.id);
     return _BrainData(

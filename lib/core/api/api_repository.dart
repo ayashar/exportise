@@ -191,11 +191,13 @@ class ApiRepository {
     int? analysProductId,
     int? designReferenceId,
   }) async {
-    final body = <String, dynamic>{
-      'message': message,
-      if (analysProductId != null) 'analys_product_id': analysProductId,
-      if (designReferenceId != null) 'design_reference_id': designReferenceId,
-    };
+    final body = <String, dynamic>{'message': message};
+    if (analysProductId != null) {
+      body['analys_product_id'] = analysProductId;
+    }
+    if (designReferenceId != null) {
+      body['design_reference_id'] = designReferenceId;
+    }
 
     final json = await _client.postJson(
       '/api/chat/sessions/$sessionId/send',

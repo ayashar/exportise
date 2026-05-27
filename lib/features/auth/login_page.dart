@@ -119,7 +119,7 @@ class _LoginPageState extends State<LoginPage> {
         password: _passwordController.text,
       );
 
-      if (!mounted) {
+      if (!context.mounted) {
         return;
       }
 
@@ -128,7 +128,7 @@ class _LoginPageState extends State<LoginPage> {
         (route) => false,
       );
     } on ApiException catch (error) {
-      if (!mounted) {
+      if (!context.mounted) {
         return;
       }
 
@@ -138,7 +138,7 @@ class _LoginPageState extends State<LoginPage> {
         ),
       );
     } catch (_) {
-      if (!mounted) {
+      if (!context.mounted) {
         return;
       }
 

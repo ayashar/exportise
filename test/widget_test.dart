@@ -10,6 +10,10 @@ void main() {
   ) async {
     await tester.pumpWidget(const MyApp());
 
+    expect(find.text('Exportise'), findsOneWidget);
+
+    await _finishSplash(tester);
+
     expect(
       find.text('Produkmu bisa laku di\nAmerika, Eropa, Jepang'),
       findsOneWidget,
@@ -222,7 +226,13 @@ Future<void> _openHome(WidgetTester tester) async {
 
 Future<void> _openLogin(WidgetTester tester) async {
   await tester.pumpWidget(const MyApp());
+  await _finishSplash(tester);
   await tester.ensureVisible(find.text('Lewati'));
   await tester.tap(find.text('Lewati'));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _finishSplash(WidgetTester tester) async {
+  await tester.pump(const Duration(milliseconds: 3200));
   await tester.pumpAndSettle();
 }

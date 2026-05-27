@@ -186,7 +186,7 @@ class _AnalysisInputPageState extends State<AnalysisInputPage> {
         productName: _productNameController.text.trim(),
       );
 
-      if (!mounted) {
+      if (!context.mounted) {
         return;
       }
 
@@ -196,7 +196,7 @@ class _AnalysisInputPageState extends State<AnalysisInputPage> {
         ),
       );
     } on ApiException catch (error) {
-      if (!mounted) {
+      if (!context.mounted) {
         return;
       }
 
@@ -208,7 +208,7 @@ class _AnalysisInputPageState extends State<AnalysisInputPage> {
         ),
       );
     } catch (_) {
-      if (!mounted) {
+      if (!context.mounted) {
         return;
       }
 

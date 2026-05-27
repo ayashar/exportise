@@ -514,7 +514,7 @@ class _ReferenceImage extends StatelessWidget {
             : Image.network(
                 imageUrl!,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) {
+                errorBuilder: (_, _, _) {
                   return Container(
                     color: AppColors.neutral03,
                     alignment: Alignment.center,
