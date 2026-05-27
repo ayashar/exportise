@@ -6,6 +6,7 @@ import '../../core/theme/app_typography.dart';
 import '../../shared/widgets/app_bottom_navigation.dart';
 import '../../shared/widgets/app_button.dart';
 import '../analysis/analysis_input_page.dart';
+import '../auth/login_page.dart';
 import '../brains/brain_studio_page.dart';
 import '../notifications/notification_page.dart';
 import '../reports/history_page.dart';
@@ -144,6 +145,20 @@ class _ProfilePageState extends State<ProfilePage> {
                       ],
                     ),
                   ],
+                  const SizedBox(height: 24),
+                  AppButton(
+                    label: 'Logout',
+                    isFullWidth: true,
+                    variant: AppButtonVariant.danger,
+                    onPressed: () {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute<void>(
+                          builder: (context) => const LoginPage(),
+                        ),
+                        (route) => false,
+                      );
+                    },
+                  ),
                 ],
               ),
             ),

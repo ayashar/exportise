@@ -17,6 +17,10 @@ abstract final class AppIcons {
     PhosphorIconsStyle style = PhosphorIconsStyle.regular,
   ]) => PhosphorIcons.arrowRight(style);
 
+  static PhosphorIconData arrowLeft([
+    PhosphorIconsStyle style = PhosphorIconsStyle.regular,
+  ]) => PhosphorIcons.arrowLeft(style);
+
   static PhosphorIconData bag([
     PhosphorIconsStyle style = PhosphorIconsStyle.regular,
   ]) => PhosphorIcons.bag(style);
@@ -73,6 +77,10 @@ abstract final class AppIcons {
     PhosphorIconsStyle style = PhosphorIconsStyle.regular,
   ]) => PhosphorIcons.gearSix(style);
 
+  static PhosphorIconData globe([
+    PhosphorIconsStyle style = PhosphorIconsStyle.regular,
+  ]) => PhosphorIcons.globeHemisphereEast(style);
+
   static PhosphorIconData home([
     PhosphorIconsStyle style = PhosphorIconsStyle.regular,
   ]) => PhosphorIcons.house(style);
@@ -80,6 +88,10 @@ abstract final class AppIcons {
   static PhosphorIconData package([
     PhosphorIconsStyle style = PhosphorIconsStyle.regular,
   ]) => PhosphorIcons.package(style);
+
+  static PhosphorIconData leaf([
+    PhosphorIconsStyle style = PhosphorIconsStyle.regular,
+  ]) => PhosphorIcons.leaf(style);
 
   static PhosphorIconData mic([
     PhosphorIconsStyle style = PhosphorIconsStyle.regular,

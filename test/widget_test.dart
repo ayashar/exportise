@@ -6,7 +6,7 @@ import 'package:eksportise_frontend/main.dart';
 
 void main() {
   testWidgets('Home page smoke test', (WidgetTester tester) async {
-    await tester.pumpWidget(const MyApp());
+    await _openHome(tester);
 
     expect(find.text('Halo! Arunika Tas'), findsOneWidget);
     expect(find.text('Level Eksportir Pemula'), findsOneWidget);
@@ -14,7 +14,7 @@ void main() {
   });
 
   testWidgets('Analysis flow smoke test', (WidgetTester tester) async {
-    await tester.pumpWidget(const MyApp());
+    await _openHome(tester);
 
     await tester.tap(find.text('Analisis sekarang'));
     await tester.pumpAndSettle();
@@ -39,7 +39,7 @@ void main() {
   testWidgets('Analysis details accordion toggles content', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const MyApp());
+    await _openHome(tester);
 
     await tester.tap(find.text('Analisis sekarang'));
     await tester.pumpAndSettle();
@@ -64,7 +64,7 @@ void main() {
   testWidgets('History page shows downloadable reference and result tabs', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const MyApp());
+    await _openHome(tester);
 
     await tester.tap(find.text('Laporanku'));
     await tester.pumpAndSettle();
@@ -83,13 +83,14 @@ void main() {
   testWidgets('Header profile and notification navigation works', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const MyApp());
+    await _openHome(tester);
 
     await tester.tap(find.text('Arunika Tas').first);
     await tester.pumpAndSettle();
 
     expect(find.text('Informasi Akun'), findsOneWidget);
     expect(find.text('Informasi UMKM'), findsOneWidget);
+    expect(find.text('Logout'), findsOneWidget);
 
     await tester.tap(find.text('Ubah Profile'));
     await tester.pumpAndSettle();
@@ -108,10 +109,23 @@ void main() {
     expect(find.text('Unduh PDF'), findsWidgets);
   });
 
+  testWidgets('Profile logout returns to login', (WidgetTester tester) async {
+    await _openHome(tester);
+
+    await tester.tap(find.text('Arunika Tas').first);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Logout'));
+    await tester.tap(find.text('Logout'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Selamat Datang!'), findsOneWidget);
+    expect(find.text('Masuk'), findsOneWidget);
+  });
+
   testWidgets('BrainS bottom nav opens fresh BrainStudio conversation', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const MyApp());
+    await _openHome(tester);
 
     await tester.tap(find.text('BrainS'));
     await tester.pumpAndSettle();
@@ -124,7 +138,7 @@ void main() {
   testWidgets('Design reference discussion opens contextual chatbot', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const MyApp());
+    await _openHome(tester);
 
     await tester.tap(find.text('Analisis sekarang'));
     await tester.pumpAndSettle();
@@ -143,4 +157,33 @@ void main() {
     expect(find.textContaining('Hai Arunika Tas'), findsOneWidget);
     expect(find.text('The Manhattan\nCircle'), findsOneWidget);
   });
+
+  testWidgets('Login and register screens render auth flow', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const MyApp());
+
+    expect(find.text('Selamat Datang!'), findsOneWidget);
+    expect(find.text('Masuk'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Daftar di sini'));
+    await tester.tap(find.text('Daftar di sini'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mulai Ekspor Sekarang'), findsOneWidget);
+    expect(find.text('Nama Lengkap'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Selanjutnya'));
+    await tester.tap(find.text('Selanjutnya'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nama UMKM'), findsOneWidget);
+    expect(find.text('Daftar'), findsOneWidget);
+  });
+}
+
+Future<void> _openHome(WidgetTester tester) async {
+  await tester.pumpWidget(const MyApp());
+  await tester.tap(find.text('Masuk'));
+  await tester.pumpAndSettle();
 }

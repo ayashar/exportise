@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'features/home/home_page.dart';
 import 'core/theme/app_theme.dart';
+import 'features/auth/login_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,7 +27,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Eksportise',
       theme: AppTheme.light,
-      home: const HomePage(),
+      home: const LoginPage(),
     );
   }
 }
