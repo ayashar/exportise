@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/api/api_repository.dart';
 import '../../core/iconography/app_icons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -20,7 +22,19 @@ class AnalysisInputPage extends StatefulWidget {
 }
 
 class _AnalysisInputPageState extends State<AnalysisInputPage> {
+  final _repository = ApiRepository();
+  final _productNameController = TextEditingController();
+  final _descriptionController = TextEditingController();
+
   String? _category;
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _productNameController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -77,9 +91,12 @@ class _AnalysisInputPageState extends State<AnalysisInputPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const _FieldLabel('Nama barang'),
+                        const _FieldLabel('Nama produk'),
                         const SizedBox(height: 10),
-                        const _AppTextField(hintText: 'e.g., tas anyaman'),
+                        _AppTextField(
+                          controller: _productNameController,
+                          hintText: 'e.g., tas anyaman',
+                        ),
                         const SizedBox(height: 28),
                         const _FieldLabel('Kategori'),
                         const SizedBox(height: 10),
@@ -92,7 +109,12 @@ class _AnalysisInputPageState extends State<AnalysisInputPage> {
                         const SizedBox(height: 28),
                         const _FieldLabel('Deskripsi Produk'),
                         const SizedBox(height: 10),
-                        const _AppTextField(hintText: 'e.g., tas anyaman'),
+                        _AppTextField(
+                          controller: _descriptionController,
+                          hintText:
+                              'Jelaskan singkat produk, material, dan target pasar.',
+                          maxLines: 5,
+                        ),
                       ],
                     ),
                   ),
@@ -100,14 +122,9 @@ class _AnalysisInputPageState extends State<AnalysisInputPage> {
                   AppButton(
                     label: 'Analisis Market',
                     isFullWidth: true,
+                    isLoading: _isLoading,
                     size: AppButtonSize.lg,
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (context) => const AnalysisResultPage(),
-                        ),
-                      );
-                    },
+                    onPressed: _isLoading ? null : () => _submit(context),
                   ),
                 ],
               ),
@@ -141,6 +158,72 @@ class _AnalysisInputPageState extends State<AnalysisInputPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _submit(BuildContext context) async {
+    final category = _category;
+    if (category == null || category.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pilih kategori terlebih dahulu.')),
+      );
+      return;
+    }
+
+    if (_productNameController.text.trim().isEmpty ||
+        _descriptionController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nama produk dan deskripsi wajib diisi.')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final product = await _repository.createAnalysisProduct(
+        category: _apiCategory(category),
+        description: _descriptionController.text.trim(),
+        productName: _productNameController.text.trim(),
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (context) => AnalysisResultPage(analysProductId: product.id),
+        ),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.message.isEmpty ? 'Analisis gagal dibuat' : error.message,
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Analisis gagal dibuat. Coba lagi.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  String _apiCategory(String value) {
+    return value.toLowerCase();
   }
 }
 
@@ -234,13 +317,21 @@ class _FieldLabel extends StatelessWidget {
 }
 
 class _AppTextField extends StatelessWidget {
-  const _AppTextField({required this.hintText});
+  const _AppTextField({
+    required this.controller,
+    required this.hintText,
+    this.maxLines = 1,
+  });
 
+  final TextEditingController controller;
   final String hintText;
+  final int maxLines;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
+      controller: controller,
+      maxLines: maxLines,
       style: AppTypography.bodyMd.copyWith(color: AppColors.neutral09),
       decoration: _fieldDecoration(hintText),
     );
@@ -257,7 +348,7 @@ class _CategoryDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppDropdownField(
       hintText: 'Pilih Kategori',
-      items: const ['Kerajinan Tangan', 'Pakaian'],
+      items: const ['Pakaian', 'Kerajinan Tangan'],
       onChanged: onChanged,
       textStyle: AppTypography.bodyMd.copyWith(color: AppColors.neutral09),
       value: value,

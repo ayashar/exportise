@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../core/download/asset_downloader.dart';
+import '../../core/api/api_client.dart';
+import '../../core/api/api_models.dart';
+import '../../core/api/api_repository.dart';
 import '../../core/iconography/app_icons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -13,7 +15,7 @@ import '../reports/history_page.dart';
 
 enum ChatbotMode { designReference, fresh }
 
-class BrainStudioPage extends StatelessWidget {
+class BrainStudioPage extends StatefulWidget {
   const BrainStudioPage.designReference({super.key})
     : mode = ChatbotMode.designReference;
 
@@ -22,70 +24,250 @@ class BrainStudioPage extends StatelessWidget {
   final ChatbotMode mode;
 
   @override
+  State<BrainStudioPage> createState() => _BrainStudioPageState();
+}
+
+class _BrainStudioPageState extends State<BrainStudioPage> {
+  final _repository = ApiRepository();
+  final _composerController = TextEditingController();
+
+  late Future<_BrainData> _brainFuture;
+  bool _isSending = false;
+  bool _isCreatingSession = false;
+  int? _selectedSessionId;
+
+  @override
+  void initState() {
+    super.initState();
+    _brainFuture = _loadData();
+  }
+
+  @override
+  void dispose() {
+    _composerController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.neutral01,
       body: SafeArea(
         child: Stack(
           children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 28, 20, 192),
-              child: Column(
-                children: [
-                  const _ChatHeader(),
-                  const SizedBox(height: 44),
-                  const _BrainIntro(),
-                  const SizedBox(height: 48),
-                  if (mode == ChatbotMode.designReference)
-                    const _DesignReferenceConversation()
-                  else
-                    const _FreshConversation(),
-                ],
-              ),
-            ),
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const _ChatComposer(),
-                  AppBottomNavigation(
-                    selectedTab: AppTab.brains,
-                    onTabSelected: (tab) {
-                      if (tab == AppTab.home) {
-                        Navigator.of(
-                          context,
-                        ).popUntil((route) => route.isFirst);
-                      }
-                      if (tab == AppTab.analysis) {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (context) => const AnalysisInputPage(),
-                          ),
-                        );
-                      }
-                      if (tab == AppTab.reports) {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (context) => const HistoryPage(),
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                ],
-              ),
+            FutureBuilder<_BrainData>(
+              future: _brainFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return _ChatError(
+                    message: _errorMessage(snapshot.error),
+                    onRetry: _reload,
+                  );
+                }
+
+                final data = snapshot.data;
+                if (data == null) {
+                  return _ChatError(
+                    message: 'Riwayat chat belum tersedia.',
+                    onRetry: _reload,
+                  );
+                }
+
+                return Column(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
+                        child: Column(
+                          children: [
+                            _ChatHeader(),
+                            const SizedBox(height: 28),
+                            _BrainIntro(mode: widget.mode),
+                            const SizedBox(height: 20),
+                            _SessionRow(
+                              isCreatingSession: _isCreatingSession,
+                              onCreateSession: _createNewSession,
+                              sessions: data.sessions,
+                              selectedSessionId:
+                                  _selectedSessionId ?? data.activeSession?.id,
+                              onSelectSession: _selectSession,
+                            ),
+                            const SizedBox(height: 20),
+                            if (data.activeSession == null)
+                              const _EmptyChatState()
+                            else
+                              _MessageList(
+                                messages: data.messages,
+                                mode: widget.mode,
+                                activeSession: data.activeSession!,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    _ChatComposer(
+                      controller: _composerController,
+                      isSending: _isSending,
+                      onSend: data.activeSession == null
+                          ? null
+                          : () => _sendMessage(data.activeSession!),
+                    ),
+                    AppBottomNavigation(
+                      selectedTab: AppTab.brains,
+                      onTabSelected: (tab) {
+                        if (tab == AppTab.home) {
+                          Navigator.of(
+                            context,
+                          ).popUntil((route) => route.isFirst);
+                        }
+                        if (tab == AppTab.analysis) {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (context) => const AnalysisInputPage(),
+                            ),
+                          );
+                        }
+                        if (tab == AppTab.reports) {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (context) => const HistoryPage(),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                );
+              },
             ),
           ],
         ),
       ),
     );
   }
+
+  Future<_BrainData> _loadData() async {
+    final sessions = await _repository.listChatSessions();
+
+    ChatSession? activeSession;
+    if (_selectedSessionId != null) {
+      activeSession = sessions
+          .where((session) => session.id == _selectedSessionId)
+          .cast<ChatSession?>()
+          .firstOrNull;
+    }
+
+    activeSession ??= sessions.isNotEmpty ? sessions.first : null;
+
+    if (activeSession == null) {
+      activeSession = await _createSessionInternal();
+    }
+
+    final messages = await _repository.listMessages(activeSession.id);
+    return _BrainData(
+      activeSession: activeSession,
+      messages: messages,
+      sessions: [
+        activeSession,
+        ...sessions.where((session) => session.id != activeSession!.id),
+      ],
+    );
+  }
+
+  Future<void> _reload() async {
+    setState(() {
+      _brainFuture = _loadData();
+    });
+  }
+
+  Future<void> _selectSession(ChatSession session) async {
+    setState(() => _selectedSessionId = session.id);
+    await _reload();
+  }
+
+  Future<void> _createNewSession() async {
+    if (_isCreatingSession) {
+      return;
+    }
+
+    setState(() => _isCreatingSession = true);
+
+    try {
+      final session = await _createSessionInternal();
+      setState(() => _selectedSessionId = session.id);
+      await _reload();
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.message.isEmpty ? 'Gagal membuat sesi chat' : error.message,
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isCreatingSession = false);
+      }
+    }
+  }
+
+  Future<ChatSession> _createSessionInternal() {
+    return _repository.createChatSession(
+      title: widget.mode == ChatbotMode.designReference
+          ? 'Diskusi Design Reference'
+          : 'Diskusi Baru',
+    );
+  }
+
+  Future<void> _sendMessage(ChatSession activeSession) async {
+    final text = _composerController.text.trim();
+    if (text.isEmpty || _isSending) {
+      return;
+    }
+
+    setState(() => _isSending = true);
+
+    try {
+      await _repository.sendMessage(sessionId: activeSession.id, message: text);
+      _composerController.clear();
+      await _reload();
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.message.isEmpty ? 'Pesan gagal dikirim' : error.message,
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSending = false);
+      }
+    }
+  }
+
+  String _errorMessage(Object? error) {
+    if (error is ApiException) {
+      return error.message;
+    }
+
+    return 'Gagal memuat Brain Studio.';
+  }
 }
 
 class _ChatHeader extends StatelessWidget {
-  const _ChatHeader();
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -144,7 +326,9 @@ class _ChatHeader extends StatelessWidget {
 }
 
 class _BrainIntro extends StatelessWidget {
-  const _BrainIntro();
+  const _BrainIntro({required this.mode});
+
+  final ChatbotMode mode;
 
   @override
   Widget build(BuildContext context) {
@@ -172,7 +356,9 @@ class _BrainIntro extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Asisten AI desain produk untuk\nmenembus pasar internasional.',
+          mode == ChatbotMode.designReference
+              ? 'Diskusi referensi desain dan pengembangan visual.'
+              : 'Asisten AI desain produk untuk\nmenembus pasar internasional.',
           textAlign: TextAlign.center,
           style: AppTypography.bodyMd.copyWith(
             color: AppColors.neutral08,
@@ -184,97 +370,116 @@ class _BrainIntro extends StatelessWidget {
   }
 }
 
-class _DesignReferenceConversation extends StatelessWidget {
-  const _DesignReferenceConversation();
+class _SessionRow extends StatelessWidget {
+  const _SessionRow({
+    required this.isCreatingSession,
+    required this.onCreateSession,
+    required this.onSelectSession,
+    required this.selectedSessionId,
+    required this.sessions,
+  });
+
+  final bool isCreatingSession;
+  final VoidCallback onCreateSession;
+  final ValueChanged<ChatSession> onSelectSession;
+  final int? selectedSessionId;
+  final List<ChatSession> sessions;
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      children: const [
-        _AiMessage(
-          text:
-              'Hai Arunika Tas! Senang bisa berdiskusi bersama kamu, bagaimana menurut kamu terkait produk ini? Apakah kamu punya ide pengembangan desain produknya?',
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Sesi Chat',
+                style: AppTypography.bodyMd.copyWith(
+                  color: AppColors.neutral09,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: isCreatingSession ? null : onCreateSession,
+              icon: AppIcon(
+                AppIcons.addCircle(),
+                color: AppColors.primary05,
+                dimension: 16,
+              ),
+              label: Text(isCreatingSession ? 'Membuat...' : 'Baru'),
+            ),
+          ],
         ),
-        SizedBox(height: 18),
-        _ChatImageCard(
-          imagePath: 'assets/images/analysis/design_ref_a.png',
-          title: 'Variasi A',
-          subtitle: 'Modern Alami',
+        const SizedBox(height: 12),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: sessions
+                .map(
+                  (session) => Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: ChoiceChip(
+                      label: Text(session.title),
+                      selected: selectedSessionId == session.id,
+                      onSelected: (_) => onSelectSession(session),
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
         ),
-        SizedBox(height: 32),
-        _UserMessage(
-          text:
-              'Saya ingin modifikasi untuk bentuk tas pegangangan tasnya lebih setengah lingkaran',
-        ),
-        SizedBox(height: 36),
-        _AiMessage(
-          text:
-              'Ide yang bagus! baiklah saya akan memberikan kamu referensi desainnya sesuai yang kamu minta',
-        ),
-        SizedBox(height: 18),
-        _ChatImageCard(
-          imagePath: 'assets/images/analysis/history_result_circle.jpg',
-          title: 'The Manhattan',
-          subtitle: 'Circle',
-          downloadFileName: 'the-manhattan-circle.jpg',
-        ),
-        SizedBox(height: 34),
-        _UserMessage(text: 'OKE INI BAGUUSS! TERIMA KASIH'),
       ],
     );
   }
 }
 
-class _FreshConversation extends StatelessWidget {
-  const _FreshConversation();
+class _MessageList extends StatelessWidget {
+  const _MessageList({
+    required this.activeSession,
+    required this.messages,
+    required this.mode,
+  });
+
+  final ChatSession activeSession;
+  final List<ChatMessage> messages;
+  final ChatbotMode mode;
+
+  @override
+  Widget build(BuildContext context) {
+    if (messages.isEmpty) {
+      return _EmptyChatState(mode: mode);
+    }
+
+    return Column(
+      children: messages
+          .map(
+            (message) => Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: message.role == 'assistant'
+                  ? _AiMessage(text: message.content)
+                  : _UserMessage(text: message.content),
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class _EmptyChatState extends StatelessWidget {
+  const _EmptyChatState({this.mode = ChatbotMode.fresh});
+
+  final ChatbotMode mode;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const _UserMessage(
-          text:
-              'Saya ingin mendesain koleksi pakaian premium untuk diekspor ke pasar Amerika Serikat. Estetikanya harus modern, minimalis, dan menggunakan bahan ramah lingkungan, tapi potongannya tetap terlihat modis dan cocok untuk dipakainya di area urban (perkotaan) di sana.',
-        ),
-        const SizedBox(height: 34),
-        const _AiMessage(
-          text:
-              'Pilihan yang menarik. Untuk pasar AS, kita bisa mengangkat konsep Eco-Utility Minimalist. Kita buat lini pakaian dasar (essential pieces) seperti oversized blazer atau unisex trench coat menggunakan bahan campuran rami organik (organic hemp) dan katun daur ulang dengan warna-warna bumi (earthy tones) yang netral. Potongannya longgar, nyaman, tapi punya struktur yang tegas. Berikut adalah draf pertama untuk desain pakaiannya',
-        ),
-        const SizedBox(height: 18),
-        const _ChatImageCard(
-          imagePath: 'assets/images/chat/chat_jacket_a.png',
-          title: 'Eco-Utility Essential',
-        ),
-        const SizedBox(height: 34),
-        const _UserMessage(
-          text:
-              'Bagus sekali! Tapi karakter konsumen AS biasanya suka gaya yang sedikit lebih berani (bold) dan fungsional. Bisakah kita buat desainnya lebih praktis, mungkin ditambahkan detail saku utilitarian (saku kargo tersembunyi) dan aksen warna kontras yang khas seperti navy blue atau terracotta?',
-        ),
-        const SizedBox(height: 34),
-        const _AiMessage(
-          text:
-              'Tentu. Menambahkan elemen utilitarian seperti saku taktis yang menyatu rapi dengan desain minimalis sangat cocok dengan budaya AS yang dinamis dan menyukai kepraktisan (function-meets-fashion). Memberi sentuhan warna terracotta atau navy blue juga akan membuatnya langsung menarik perhatian di etalase retail.',
-        ),
-        const SizedBox(height: 18),
-        const _ChatImageCard(
-          imagePath: 'assets/images/chat/chat_jacket_b.png',
-          title: 'Eco-Utility',
-          subtitle: 'Essential',
-          downloadFileName: 'eco-utility-essential.png',
-        ),
-        const SizedBox(height: 24),
-        AppButton(
-          label: 'Analisis sekarang',
-          isFullWidth: true,
-          size: AppButtonSize.sm,
-          onPressed: () {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (context) => const AnalysisInputPage(),
-              ),
-            );
-          },
+        _AiMessage(
+          text: mode == ChatbotMode.designReference
+              ? 'Hai! Kirimkan detail modifikasi desain yang kamu inginkan.'
+              : 'Hai! Ceritakan produk dan target pasar yang ingin kamu kejar.',
         ),
       ],
     );
@@ -388,159 +593,23 @@ class _BrainAvatar extends StatelessWidget {
   }
 }
 
-class _ChatImageCard extends StatelessWidget {
-  const _ChatImageCard({
-    required this.imagePath,
-    required this.title,
-    this.downloadFileName,
-    this.subtitle,
-  });
-
-  final String? downloadFileName;
-  final String imagePath;
-  final String? subtitle;
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: FractionallySizedBox(
-        widthFactor: 0.74,
-        child: Container(
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: AppColors.system01,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.neutral03),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x0F7A5900),
-                blurRadius: 16,
-                offset: Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Image.asset(
-                imagePath,
-                width: double.infinity,
-                height: 206,
-                fit: BoxFit.cover,
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        subtitle == null ? title : '$title\n$subtitle',
-                        style: AppTypography.bodyMd.copyWith(
-                          color: AppColors.neutral08,
-                          height: 1.35,
-                        ),
-                      ),
-                    ),
-                    if (downloadFileName != null)
-                      _DownloadChatAssetButton(
-                        assetPath: imagePath,
-                        fileName: downloadFileName!,
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DownloadChatAssetButton extends StatefulWidget {
-  const _DownloadChatAssetButton({
-    required this.assetPath,
-    required this.fileName,
-  });
-
-  final String assetPath;
-  final String fileName;
-
-  @override
-  State<_DownloadChatAssetButton> createState() =>
-      _DownloadChatAssetButtonState();
-}
-
-class _DownloadChatAssetButtonState extends State<_DownloadChatAssetButton> {
-  bool _isDownloading = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextButton.icon(
-      onPressed: _isDownloading ? null : _download,
-      icon: AppIcon(
-        AppIcons.download(),
-        color: AppColors.neutral08,
-        dimension: 18,
-      ),
-      label: Text(
-        _isDownloading ? '...' : 'Unduh',
-        style: AppTypography.bodyMd.copyWith(
-          color: AppColors.neutral08,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-
-  Future<void> _download() async {
-    setState(() => _isDownloading = true);
-
-    try {
-      final result = await downloadAsset(
-        assetPath: widget.assetPath,
-        fileName: widget.fileName,
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      final message = result.path == null
-          ? '${result.fileName} sedang diunduh.'
-          : '${result.fileName} tersimpan di ${result.path}.';
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unduhan belum berhasil. Coba lagi.')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isDownloading = false);
-      }
-    }
-  }
-}
-
 class _ChatComposer extends StatelessWidget {
-  const _ChatComposer();
+  const _ChatComposer({
+    required this.controller,
+    required this.isSending,
+    required this.onSend,
+  });
+
+  final TextEditingController controller;
+  final bool isSending;
+  final VoidCallback? onSend;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
       child: Container(
-        height: 58,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: AppColors.system01,
           borderRadius: BorderRadius.circular(24),
@@ -559,21 +628,84 @@ class _ChatComposer extends StatelessWidget {
               color: AppColors.system07,
               dimension: 24,
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                'Tanyakan ide desain...',
-                style: AppTypography.bodyMd.copyWith(color: AppColors.system06),
+              child: TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  hintText: 'Tanyakan ide desain...',
+                  border: InputBorder.none,
+                ),
               ),
             ),
             AppIcon(AppIcons.mic(), color: AppColors.system07, dimension: 22),
-            const SizedBox(width: 16),
-            AppIcon(AppIcons.send(), color: AppColors.neutral08, dimension: 28),
+            const SizedBox(width: 12),
+            InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: isSending ? null : onSend,
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.primary04,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Center(
+                  child: isSending
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : AppIcon(
+                          AppIcons.send(),
+                          color: AppColors.primary08,
+                          dimension: 20,
+                        ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
+}
+
+class _ChatError extends StatelessWidget {
+  const _ChatError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            AppButton(label: 'Coba lagi', onPressed: onRetry),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BrainData {
+  const _BrainData({
+    required this.activeSession,
+    required this.messages,
+    required this.sessions,
+  });
+
+  final ChatSession? activeSession;
+  final List<ChatMessage> messages;
+  final List<ChatSession> sessions;
 }
 
 void _openProfile(BuildContext context) {
@@ -586,4 +718,14 @@ void _openNotifications(BuildContext context) {
   Navigator.of(context).push(
     MaterialPageRoute<void>(builder: (context) => const NotificationPage()),
   );
+}
+
+extension<T> on Iterable<T> {
+  T? get firstOrNull {
+    if (isEmpty) {
+      return null;
+    }
+
+    return first;
+  }
 }

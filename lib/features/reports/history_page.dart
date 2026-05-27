@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 
-import '../../core/download/asset_downloader.dart';
+import '../../core/api/api_client.dart';
+import '../../core/api/api_models.dart';
+import '../../core/api/api_repository.dart';
 import '../../core/iconography/app_icons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../shared/widgets/app_bottom_navigation.dart';
+import '../../shared/widgets/app_button.dart';
 import '../analysis/analysis_input_page.dart';
+import '../analysis/analysis_result_page.dart';
 import '../brains/brain_studio_page.dart';
 import '../notifications/notification_page.dart';
 import '../profile/profile_page.dart';
@@ -18,7 +22,16 @@ class HistoryPage extends StatefulWidget {
 }
 
 class _HistoryPageState extends State<HistoryPage> {
+  final _repository = ApiRepository();
+  late Future<_HistoryData> _historyFuture;
+
   _HistoryTab _selectedTab = _HistoryTab.reference;
+
+  @override
+  void initState() {
+    super.initState();
+    _historyFuture = _loadData();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,28 +40,54 @@ class _HistoryPageState extends State<HistoryPage> {
       body: SafeArea(
         child: Stack(
           children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(18, 28, 18, 118),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const _HistoryHeader(),
-                  const SizedBox(height: 28),
-                  _HistorySegmentedControl(
-                    selectedTab: _selectedTab,
-                    onChanged: (tab) {
-                      setState(() => _selectedTab = tab);
-                    },
+            FutureBuilder<_HistoryData>(
+              future: _historyFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return _HistoryError(
+                    message: _errorMessage(snapshot.error),
+                    onRetry: _reload,
+                  );
+                }
+
+                final data = snapshot.data;
+                if (data == null) {
+                  return _HistoryError(
+                    message: 'Riwayat kosong.',
+                    onRetry: _reload,
+                  );
+                }
+
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(18, 28, 18, 118),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _HistoryHeader(),
+                      const SizedBox(height: 28),
+                      _HistorySegmentedControl(
+                        selectedTab: _selectedTab,
+                        onChanged: (tab) {
+                          setState(() => _selectedTab = tab);
+                        },
+                      ),
+                      const SizedBox(height: 22),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 180),
+                        child: _selectedTab == _HistoryTab.reference
+                            ? _ReferenceHistoryList(
+                                referenceProduct: data.referenceProduct,
+                              )
+                            : _ResultHistoryList(products: data.products),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 22),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 180),
-                    child: _selectedTab == _HistoryTab.reference
-                        ? const _ReferenceHistoryList()
-                        : const _ResultHistoryList(),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
             Align(
               alignment: Alignment.bottomCenter,
@@ -80,11 +119,38 @@ class _HistoryPageState extends State<HistoryPage> {
       ),
     );
   }
+
+  Future<_HistoryData> _loadData() async {
+    final products = await _repository.listAnalysisProducts();
+    AnalysisProduct? referenceProduct;
+    for (final product in products) {
+      if (product.designReferences.isNotEmpty) {
+        referenceProduct = product;
+        break;
+      }
+    }
+
+    referenceProduct ??= products.isNotEmpty ? products.first : null;
+
+    return _HistoryData(products: products, referenceProduct: referenceProduct);
+  }
+
+  Future<void> _reload() async {
+    setState(() {
+      _historyFuture = _loadData();
+    });
+  }
+
+  String _errorMessage(Object? error) {
+    if (error is ApiException) {
+      return error.message;
+    }
+
+    return 'Gagal memuat riwayat.';
+  }
 }
 
 class _HistoryHeader extends StatelessWidget {
-  const _HistoryHeader();
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -228,64 +294,62 @@ class _HistorySegment extends StatelessWidget {
 }
 
 class _ReferenceHistoryList extends StatelessWidget {
-  const _ReferenceHistoryList();
+  const _ReferenceHistoryList({required this.referenceProduct});
+
+  final AnalysisProduct? referenceProduct;
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
-      key: ValueKey('reference-history'),
+    final references =
+        referenceProduct?.designReferences ?? const <DesignReference>[];
+
+    return Column(
+      key: const ValueKey('reference-history'),
       children: [
-        _ReferenceHistoryCard(
-          imagePath: 'assets/images/analysis/design_ref_a.png',
-          fileName: 'variasi-a-modern-alami.png',
-          title: 'Variasi A',
-          subtitle: 'Modern Alami',
-          body:
-              'Pas untuk dipakai jalan-jalan atau acara santai. Warnanya cerah dan terlihat modern.',
-          tags: ['Gagang Kulit Vegan', 'Lining Linen Putih'],
-          recommended: true,
-        ),
-        SizedBox(height: 28),
-        _ReferenceHistoryCard(
-          imagePath: 'assets/images/analysis/design_ref_b.png',
-          fileName: 'variasi-b-rustic-natural.png',
-          title: 'Variasi B',
-          subtitle: 'Rustic Natural',
-          body:
-              'Sesuai untuk pasar East Coast AS yang menghargai nilai autentisitas kerajinan tangan (artisanal) dan keberlanjutan material.',
-          tags: ['Handle Kayu Jati', 'Pola Anyam Renggang'],
-        ),
-        SizedBox(height: 28),
-        _ReferenceHistoryCard(
-          imagePath: 'assets/images/analysis/design_ref_c.png',
-          fileName: 'variasi-c-minimalist-japandi.png',
-          title: 'Variasi C',
-          subtitle: 'Minimalist Japandi',
-          body:
-              'Model paling simpel dan rapi. Cocok untuk Umma yang suka gaya sederhana tapi tetap cantik.',
-          tags: ['Penutup Magnet Tersembunyi', 'Detail Anyam Geometris'],
-        ),
+        if (referenceProduct == null)
+          const _EmptyHistoryCard(
+            message: 'Belum ada hasil analisis yang punya design reference.',
+          )
+        else if (references.isEmpty)
+          const _EmptyHistoryCard(
+            message: 'Analysis ini belum memiliki design reference.',
+          )
+        else
+          ...references.map(
+            (reference) => Padding(
+              padding: const EdgeInsets.only(bottom: 28),
+              child: _ReferenceHistoryCard(
+                reference: reference,
+                analysProductId: referenceProduct!.id,
+              ),
+            ),
+          ),
       ],
     );
   }
 }
 
 class _ResultHistoryList extends StatelessWidget {
-  const _ResultHistoryList();
+  const _ResultHistoryList({required this.products});
+
+  final List<AnalysisProduct> products;
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
-      key: ValueKey('result-history'),
+    return Column(
+      key: const ValueKey('result-history'),
       children: [
-        _ResultHistoryCard(
-          imagePath: 'assets/images/analysis/history_result_circle.jpg',
-          fileName: 'the-manhattan-circle.jpg',
-          title: 'The Manhattan Circle',
-          body:
-              'Pas untuk dipakai jalan-jalan atau acara santai. Warnanya cerah dan terlihat modern.',
-          tags: ['Gagang Kulit Vegan', 'Lining Linen Putih'],
-        ),
+        if (products.isEmpty)
+          const _EmptyHistoryCard(
+            message: 'Belum ada hasil analisis yang tersimpan.',
+          )
+        else
+          ...products.map(
+            (product) => Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: _ResultHistoryCard(product: product),
+            ),
+          ),
       ],
     );
   }
@@ -293,68 +357,56 @@ class _ResultHistoryList extends StatelessWidget {
 
 class _ReferenceHistoryCard extends StatelessWidget {
   const _ReferenceHistoryCard({
-    required this.body,
-    required this.fileName,
-    required this.imagePath,
-    required this.subtitle,
-    required this.tags,
-    required this.title,
-    this.recommended = false,
+    required this.reference,
+    required this.analysProductId,
   });
 
-  final String body;
-  final String fileName;
-  final String imagePath;
-  final bool recommended;
-  final String subtitle;
-  final List<String> tags;
-  final String title;
+  final int analysProductId;
+  final DesignReference reference;
 
   @override
   Widget build(BuildContext context) {
     return _HistoryCardFrame(
-      imagePath: imagePath,
-      recommended: recommended,
-      imageHeight: 360,
+      imagePath:
+          reference.imageUrl ?? 'assets/images/analysis/design_ref_a.png',
+      imageHeight: 320,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            title,
+            reference.title,
             style: AppTypography.headlineSm.copyWith(
               color: AppColors.neutral09,
             ),
           ),
+          const SizedBox(height: 10),
           Text(
-            subtitle,
-            style: AppTypography.headlineSm.copyWith(
-              color: AppColors.neutral09,
-              height: 1.15,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            body,
+            reference.description,
             style: AppTypography.bodySm.copyWith(
               color: AppColors.neutral08,
               height: 1.35,
             ),
           ),
-          const SizedBox(height: 22),
-          const _RecommendationLabel(),
-          const SizedBox(height: 10),
+          const SizedBox(height: 20),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: tags.map((tag) => _HistoryTag(tag)).toList(),
+            children: reference.tags.map((tag) => _HistoryTag(tag)).toList(),
           ),
-          const SizedBox(height: 26),
+          const SizedBox(height: 20),
           Align(
             alignment: Alignment.centerRight,
-            child: _DownloadTextButton(
-              assetPath: imagePath,
-              fileName: fileName,
-              label: 'Unduh',
+            child: AppButton(
+              label: 'Buka Detail',
+              size: AppButtonSize.sm,
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (context) =>
+                        AnalysisResultPage(analysProductId: analysProductId),
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -364,57 +416,53 @@ class _ReferenceHistoryCard extends StatelessWidget {
 }
 
 class _ResultHistoryCard extends StatelessWidget {
-  const _ResultHistoryCard({
-    required this.body,
-    required this.fileName,
-    required this.imagePath,
-    required this.tags,
-    required this.title,
-  });
+  const _ResultHistoryCard({required this.product});
 
-  final String body;
-  final String fileName;
-  final String imagePath;
-  final List<String> tags;
-  final String title;
+  final AnalysisProduct product;
 
   @override
   Widget build(BuildContext context) {
     return _HistoryCardFrame(
-      imagePath: imagePath,
-      imageHeight: 367,
+      imagePath: 'assets/images/analysis/history_result_circle.jpg',
+      imageHeight: 260,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: AppTypography.headlineSm.copyWith(
-              color: AppColors.neutral09,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  product.productName,
+                  style: AppTypography.headlineSm.copyWith(
+                    color: AppColors.neutral09,
+                  ),
+                ),
+              ),
+              _StatusLabel(status: product.status),
+            ],
           ),
           const SizedBox(height: 10),
           Text(
-            body,
+            product.description,
             style: AppTypography.bodyMd.copyWith(
               color: AppColors.neutral08,
               height: 1.35,
             ),
           ),
-          const SizedBox(height: 26),
-          const _RecommendationLabel(),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: tags.map((tag) => _HistoryTag(tag)).toList(),
-          ),
-          const SizedBox(height: 34),
+          const SizedBox(height: 18),
           Align(
             alignment: Alignment.centerRight,
-            child: _DownloadTextButton(
-              assetPath: imagePath,
-              fileName: fileName,
-              label: 'Unduh JPG',
+            child: AppButton(
+              label: product.isDone ? 'Buka hasil' : 'Lihat proses',
+              size: AppButtonSize.sm,
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (context) =>
+                        AnalysisResultPage(analysProductId: product.id),
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -428,13 +476,11 @@ class _HistoryCardFrame extends StatelessWidget {
     required this.child,
     required this.imageHeight,
     required this.imagePath,
-    this.recommended = false,
   });
 
   final Widget child;
   final double imageHeight;
   final String imagePath;
-  final bool recommended;
 
   @override
   Widget build(BuildContext context) {
@@ -456,45 +502,7 @@ class _HistoryCardFrame extends StatelessWidget {
         children: [
           Stack(
             children: [
-              Image.asset(
-                imagePath,
-                width: double.infinity,
-                height: imageHeight,
-                fit: BoxFit.cover,
-              ),
-              if (recommended)
-                Positioned(
-                  top: 18,
-                  right: 14,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary04,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AppIcon(
-                          AppIcons.sparkle(PhosphorIconsStyle.fill),
-                          color: AppColors.primary08,
-                          dimension: 14,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Rekomendasi Terbaik',
-                          style: AppTypography.bodySm.copyWith(
-                            color: AppColors.primary08,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              _HistoryImage(imagePath: imagePath, height: imageHeight),
             ],
           ),
           Padding(
@@ -507,89 +515,52 @@ class _HistoryCardFrame extends StatelessWidget {
   }
 }
 
-class _DownloadTextButton extends StatefulWidget {
-  const _DownloadTextButton({
-    required this.assetPath,
-    required this.fileName,
-    required this.label,
-  });
+class _HistoryImage extends StatelessWidget {
+  const _HistoryImage({required this.imagePath, required this.height});
 
-  final String assetPath;
-  final String fileName;
-  final String label;
-
-  @override
-  State<_DownloadTextButton> createState() => _DownloadTextButtonState();
-}
-
-class _DownloadTextButtonState extends State<_DownloadTextButton> {
-  bool _isDownloading = false;
+  final double height;
+  final String imagePath;
 
   @override
   Widget build(BuildContext context) {
-    return TextButton.icon(
-      onPressed: _isDownloading ? null : _download,
-      icon: AppIcon(
-        AppIcons.download(),
-        color: AppColors.neutral08,
-        dimension: 18,
-      ),
-      label: Text(
-        _isDownloading ? 'Mengunduh...' : widget.label,
-        style: AppTypography.bodyMd.copyWith(
-          color: AppColors.neutral08,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
+    if (imagePath.startsWith('http')) {
+      return Image.network(
+        imagePath,
+        width: double.infinity,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) {
+          return _FallbackHistoryImage(height: height);
+        },
+      );
+    }
+
+    return Image.asset(
+      imagePath,
+      width: double.infinity,
+      height: height,
+      fit: BoxFit.cover,
     );
   }
-
-  Future<void> _download() async {
-    setState(() => _isDownloading = true);
-
-    try {
-      final result = await downloadAsset(
-        assetPath: widget.assetPath,
-        fileName: widget.fileName,
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      final message = result.path == null
-          ? '${result.fileName} sedang diunduh.'
-          : '${result.fileName} tersimpan di ${result.path}.';
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unduhan belum berhasil. Coba lagi.')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isDownloading = false);
-      }
-    }
-  }
 }
 
-class _RecommendationLabel extends StatelessWidget {
-  const _RecommendationLabel();
+class _FallbackHistoryImage extends StatelessWidget {
+  const _FallbackHistoryImage({required this.height});
+
+  final double height;
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      'Rekomendasi Elemen',
-      style: AppTypography.bodySm.copyWith(
-        color: AppColors.primary05,
-        fontWeight: FontWeight.w700,
+    return Container(
+      width: double.infinity,
+      height: height,
+      color: AppColors.neutral03,
+      child: Center(
+        child: AppIcon(
+          AppIcons.package(),
+          color: AppColors.neutral07,
+          dimension: 36,
+        ),
       ),
     );
   }
@@ -619,6 +590,84 @@ class _HistoryTag extends StatelessWidget {
       ),
     );
   }
+}
+
+class _StatusLabel extends StatelessWidget {
+  const _StatusLabel({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDone = status.toLowerCase() == 'done';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDone ? AppColors.tertiary02 : AppColors.secondary04,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(
+        status,
+        style: AppTypography.bodySm.copyWith(
+          color: AppColors.primary08,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyHistoryCard extends StatelessWidget {
+  const _EmptyHistoryCard({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.system01,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(
+        message,
+        style: AppTypography.bodySm.copyWith(color: AppColors.neutral08),
+      ),
+    );
+  }
+}
+
+class _HistoryError extends StatelessWidget {
+  const _HistoryError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            AppButton(label: 'Coba lagi', onPressed: onRetry),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HistoryData {
+  const _HistoryData({required this.products, required this.referenceProduct});
+
+  final List<AnalysisProduct> products;
+  final AnalysisProduct? referenceProduct;
 }
 
 enum _HistoryTab { reference, result }

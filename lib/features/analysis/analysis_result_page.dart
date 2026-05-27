@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/api/api_models.dart';
+import '../../core/api/api_repository.dart';
 import '../../core/iconography/app_icons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -12,14 +15,27 @@ import '../reports/history_page.dart';
 import 'design_reference_page.dart';
 
 class AnalysisResultPage extends StatefulWidget {
-  const AnalysisResultPage({super.key});
+  const AnalysisResultPage({super.key, required this.analysProductId});
+
+  final int analysProductId;
 
   @override
   State<AnalysisResultPage> createState() => _AnalysisResultPageState();
 }
 
 class _AnalysisResultPageState extends State<AnalysisResultPage> {
+  final _repository = ApiRepository();
+
+  late Future<AnalysisProduct> _productFuture;
+  bool _isDeleting = false;
+  bool _isSchedulingAnalysis = false;
   bool _isDetailsExpanded = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _productFuture = _repository.getAnalysisProduct(widget.analysProductId);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,87 +44,136 @@ class _AnalysisResultPageState extends State<AnalysisResultPage> {
       body: SafeArea(
         child: Stack(
           children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 18, 16, 118),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const _ResultHeader(),
-                  const SizedBox(height: 28),
-                  Text(
-                    'Hasil Analisis',
-                    style: AppTypography.bodySm.copyWith(
-                      color: AppColors.primary05,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Tas Anyaman Bali',
-                    style: AppTypography.headlineSm.copyWith(
-                      color: AppColors.neutral09,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Analisis tren konsumen dan peluang ekspor untuk kategori kerajinan tangan tradisional',
-                    style: AppTypography.bodySm.copyWith(
-                      color: AppColors.neutral08,
-                      height: 1.25,
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  const _RecommendationCard(),
-                  const SizedBox(height: 24),
-                  const _ScoreCard(),
-                  const SizedBox(height: 24),
-                  const _BrainsAdvice(),
-                  const SizedBox(height: 28),
-                  Row(
+            FutureBuilder<AnalysisProduct>(
+              future: _productFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return _ErrorState(
+                    onRetry: _reload,
+                    message: _errorMessage(snapshot.error),
+                  );
+                }
+
+                final product = snapshot.data;
+                if (product == null) {
+                  return _ErrorState(
+                    onRetry: _reload,
+                    message: 'Data analisis kosong.',
+                  );
+                }
+
+                final report = product.report ?? const <String, dynamic>{};
+                final summary = _mapValue(report, 'summary');
+                final sections = _listValue(report, 'sections');
+
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 118),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: AppButton(
-                          label: 'Analisis Ulang',
-                          variant: AppButtonVariant.ghost,
-                          onPressed: () => Navigator.of(context).pop(),
+                      _ResultHeader(
+                        isDeleting: _isDeleting,
+                        onDelete: () => _deleteProduct(product),
+                        onRefresh: _reload,
+                      ),
+                      const SizedBox(height: 28),
+                      Text(
+                        'Hasil Analisis',
+                        style: AppTypography.bodySm.copyWith(
+                          color: AppColors.primary05,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
                         ),
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: AppButton(
-                          label: 'Referensi Desain',
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (context) =>
-                                    const DesignReferencePage(),
-                              ),
-                            );
-                          },
+                      const SizedBox(height: 10),
+                      Text(
+                        product.productName,
+                        style: AppTypography.headlineSm.copyWith(
+                          color: AppColors.neutral09,
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        product.description,
+                        style: AppTypography.bodySm.copyWith(
+                          color: AppColors.neutral08,
+                          height: 1.25,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      if (product.isProcessing) ...[
+                        _ProcessingBanner(message: product.message),
+                        const SizedBox(height: 20),
+                      ],
+                      _SummaryCard(summary: summary, product: product),
+                      const SizedBox(height: 20),
+                      _ScoreCard(summary: summary, product: product),
+                      const SizedBox(height: 20),
+                      _ActionRow(
+                        isSchedulingAnalysis: _isSchedulingAnalysis,
+                        onAnalyze: () => _scheduleAnalysis(product),
+                        onDesignReferences: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (context) => DesignReferencePage(
+                                analysProductId: product.id,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Rincian Analisis',
+                        style: AppTypography.bodyMd.copyWith(
+                          color: AppColors.primary05,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _ExpandableSectionHeader(
+                        isExpanded: _isDetailsExpanded,
+                        onTap: () {
+                          setState(() {
+                            _isDetailsExpanded = !_isDetailsExpanded;
+                          });
+                        },
+                      ),
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOutCubic,
+                        alignment: Alignment.topCenter,
+                        child: _isDetailsExpanded
+                            ? Column(
+                                children: [
+                                  const SizedBox(height: 18),
+                                  _SectionRenderer(sections: sections),
+                                  const SizedBox(height: 20),
+                                  _DesignReferencesSection(
+                                    references: product.designReferences,
+                                    onOpenAll: () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute<void>(
+                                          builder: (context) =>
+                                              DesignReferencePage(
+                                                analysProductId: product.id,
+                                              ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              )
+                            : const SizedBox.shrink(),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 34),
-                  _DetailsAccordionHeader(
-                    isExpanded: _isDetailsExpanded,
-                    onTap: () {
-                      setState(() {
-                        _isDetailsExpanded = !_isDetailsExpanded;
-                      });
-                    },
-                  ),
-                  AnimatedSize(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                    alignment: Alignment.topCenter,
-                    child: _isDetailsExpanded
-                        ? const _AnalysisDetailsContent()
-                        : const SizedBox(width: double.infinity),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
             Align(
               alignment: Alignment.bottomCenter,
@@ -140,102 +205,134 @@ class _AnalysisResultPageState extends State<AnalysisResultPage> {
       ),
     );
   }
-}
 
-class _DetailsAccordionHeader extends StatelessWidget {
-  const _DetailsAccordionHeader({
-    required this.isExpanded,
-    required this.onTap,
-  });
-
-  final bool isExpanded;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(10),
-      onTap: onTap,
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              'Rincian Analisis',
-              style: AppTypography.bodyMd.copyWith(
-                color: AppColors.primary05,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.neutral02,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.primary02),
-            ),
-            child: Center(
-              child: AppIcon(
-                isExpanded ? AppIcons.up() : AppIcons.dropdown(),
-                color: AppColors.primary05,
-                dimension: 18,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+  Future<void> _reload() async {
+    setState(() {
+      _productFuture = _repository.getAnalysisProduct(widget.analysProductId);
+    });
   }
-}
 
-class _AnalysisDetailsContent extends StatelessWidget {
-  const _AnalysisDetailsContent();
+  Future<void> _deleteProduct(AnalysisProduct product) async {
+    if (_isDeleting) {
+      return;
+    }
 
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 18),
-        const _SentimentCard(),
-        const SizedBox(height: 22),
-        const _SeasonCard(),
-        const SizedBox(height: 22),
-        const _FavoriteColorCard(),
-        const SizedBox(height: 22),
-        const _PopularCommentsCard(),
-        const SizedBox(height: 22),
-        const _PriceReferenceCard(),
-        const SizedBox(height: 24),
-        Text(
-          'Celah Peluang',
-          style: AppTypography.bodyMd.copyWith(
-            color: AppColors.neutral08,
-            fontWeight: FontWeight.w700,
+    setState(() => _isDeleting = true);
+
+    try {
+      await _repository.deleteAnalysisProduct(product.id);
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Produk dihapus.')));
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.message.isEmpty ? 'Gagal menghapus produk' : error.message,
           ),
         ),
-        const SizedBox(height: 12),
-        const _OpportunityCard(
-          icon: _OpportunityIcon.truck,
-          title: 'Kemasan Cantik Musim Panas',
-          body:
-              'Naikkan skor kemasan (72%) dengan kotak estetik bernuansa Earth Brown untuk memikat lonjakan pembeli tas anyaman menjelang tren April-Mei.',
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Gagal menghapus produk.')));
+    } finally {
+      if (mounted) {
+        setState(() => _isDeleting = false);
+      }
+    }
+  }
+
+  Future<void> _scheduleAnalysis(AnalysisProduct product) async {
+    if (_isSchedulingAnalysis) {
+      return;
+    }
+
+    setState(() => _isSchedulingAnalysis = true);
+
+    try {
+      final response = await _repository.analyzeProduct(product.id);
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _messageFromResponse(response) ?? 'Analisis dijadwalkan.',
+          ),
         ),
-        const SizedBox(height: 12),
-        const _OpportunityCard(
-          icon: _OpportunityIcon.sparkle,
-          title: 'Sentuhan Katun Sage yang Unik',
-          body:
-              'Padukan anyaman Anda yang kuat (88%) dengan furing/tali katun berwarna Sage (23% permintaan) untuk menciptakan tas anyaman berdesain unik yang langka.',
+      );
+      await _reload();
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.message.isEmpty
+                ? 'Gagal menjadwalkan analisis'
+                : error.message,
+          ),
         ),
-      ],
-    );
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal menjadwalkan analisis.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSchedulingAnalysis = false);
+      }
+    }
+  }
+
+  String? _messageFromResponse(Map<String, dynamic> response) {
+    final message = response['message'];
+    if (message == null) {
+      return null;
+    }
+
+    return message.toString();
+  }
+
+  String _errorMessage(Object? error) {
+    if (error is ApiException) {
+      return error.message;
+    }
+    return 'Gagal memuat hasil analisis.';
   }
 }
 
 class _ResultHeader extends StatelessWidget {
-  const _ResultHeader();
+  const _ResultHeader({
+    required this.isDeleting,
+    required this.onDelete,
+    required this.onRefresh,
+  });
+
+  final bool isDeleting;
+  final VoidCallback onDelete;
+  final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -268,7 +365,12 @@ class _ResultHeader extends StatelessWidget {
           onTap: () => _openNotifications(context),
         ),
         const SizedBox(width: 12),
-        _CircleIconButton(icon: AppIcons.download()),
+        _CircleIconButton(icon: AppIcons.refresh(), onTap: onRefresh),
+        const SizedBox(width: 12),
+        _CircleIconButton(
+          icon: AppIcons.download(),
+          onTap: isDeleting ? null : onDelete,
+        ),
       ],
     );
   }
@@ -301,72 +403,128 @@ class _CircleIconButton extends StatelessWidget {
   }
 }
 
-void _openProfile(BuildContext context) {
-  Navigator.of(
-    context,
-  ).push(MaterialPageRoute<void>(builder: (context) => const ProfilePage()));
-}
+class _ProcessingBanner extends StatelessWidget {
+  const _ProcessingBanner({required this.message});
 
-void _openNotifications(BuildContext context) {
-  Navigator.of(context).push(
-    MaterialPageRoute<void>(builder: (context) => const NotificationPage()),
-  );
-}
-
-class _RecommendationCard extends StatelessWidget {
-  const _RecommendationCard();
+  final String? message;
 
   @override
   Widget build(BuildContext context) {
-    return _AnalysisSectionCard(
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.secondary08,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Text(
+        message ?? 'Analisis sedang diproses, silakan cek kembali nanti',
+        style: AppTypography.bodySm.copyWith(
+          color: AppColors.neutral09,
+          height: 1.35,
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({required this.summary, required this.product});
+
+  final AnalysisProduct product;
+  final Map<String, dynamic>? summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final market = _mapValue(summary, 'recommended_market');
+    final exportReadiness = _mapValue(summary, 'export_readiness');
+
+    return _SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Rekomendasi',
+            'Ringkasan',
             style: AppTypography.bodySm.copyWith(
               color: AppColors.primary05,
               fontWeight: FontWeight.w700,
               fontSize: 11,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
+          Text(
+            _string(summary, 'title').isEmpty
+                ? product.productName
+                : _string(summary, 'title'),
+            style: AppTypography.headlineSm.copyWith(
+              color: AppColors.neutral09,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _string(summary, 'subtitle').isEmpty
+                ? 'Analisis tren konsumen dan peluang ekspor'
+                : _string(summary, 'subtitle'),
+            style: AppTypography.bodySm.copyWith(
+              color: AppColors.neutral08,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 18),
           Container(
             width: double.infinity,
-            height: 44,
-            alignment: Alignment.center,
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: AppColors.primary04,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
-              'Amerika Serikat',
+              'Pasar utama: ${_string(market, 'primary').isEmpty ? 'Belum tersedia' : _string(market, 'primary')}',
               style: AppTypography.bodyMd.copyWith(
                 color: AppColors.primary08,
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              Text(
-                'Jepang',
-                style: AppTypography.bodySm.copyWith(
-                  color: AppColors.primary05,
-                  fontWeight: FontWeight.w700,
+          const SizedBox(height: 12),
+          if (_listValue(market, 'alternatives').isNotEmpty)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _stringList(
+                _listValue(market, 'alternatives'),
+              ).map((item) => _ChipLabel(item)).toList(),
+            ),
+          if (_mapValue(exportReadiness, 'score') != null) ...[
+            const SizedBox(height: 18),
+            Text(
+              'Skor kesiapan: ${_num(exportReadiness, 'score').round()}/100',
+              style: AppTypography.bodySm.copyWith(
+                color: AppColors.neutral08,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: _num(exportReadiness, 'score') / 100,
+                minHeight: 8,
+                backgroundColor: AppColors.neutral03,
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                  AppColors.primary04,
                 ),
               ),
-              Text(
-                'Eropa',
-                style: AppTypography.bodySm.copyWith(
-                  color: AppColors.primary05,
-                  fontWeight: FontWeight.w700,
-                ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              _string(exportReadiness, 'note'),
+              style: AppTypography.bodySm.copyWith(
+                color: AppColors.neutral08,
+                height: 1.35,
               ),
-            ],
-          ),
+            ),
+          ],
         ],
       ),
     );
@@ -374,11 +532,20 @@ class _RecommendationCard extends StatelessWidget {
 }
 
 class _ScoreCard extends StatelessWidget {
-  const _ScoreCard();
+  const _ScoreCard({required this.summary, required this.product});
+
+  final AnalysisProduct product;
+  final Map<String, dynamic>? summary;
 
   @override
   Widget build(BuildContext context) {
-    return _AnalysisSectionCard(
+    final exportReadiness = _mapValue(summary, 'export_readiness');
+    final score = _num(exportReadiness, 'score');
+    final label = _string(exportReadiness, 'label').isEmpty
+        ? product.status
+        : _string(exportReadiness, 'label');
+
+    return _SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -393,7 +560,7 @@ class _ScoreCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const _StatusBadge(label: 'Siap', tone: _StatusTone.ready),
+              _StatusBadge(label: label.isEmpty ? 'Belum ada' : label),
             ],
           ),
           const SizedBox(height: 8),
@@ -402,7 +569,7 @@ class _ScoreCard extends StatelessWidget {
               style: AppTypography.bodySm.copyWith(color: AppColors.neutral08),
               children: [
                 TextSpan(
-                  text: '82',
+                  text: score.toStringAsFixed(0),
                   style: AppTypography.headlineLg.copyWith(
                     color: AppColors.primary05,
                     fontWeight: FontWeight.w700,
@@ -414,17 +581,26 @@ class _ScoreCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Row(
-            children: const [
-              _ScoreSegment(active: true),
-              _ScoreSegment(active: true),
-              _ScoreSegment(active: true),
-              _ScoreSegment(active: true),
-              _ScoreSegment(active: false),
-            ],
+            children: List.generate(5, (index) {
+              return Expanded(
+                child: Container(
+                  height: 7,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: index < (score / 20).ceil()
+                        ? AppColors.primary04
+                        : AppColors.neutral03,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              );
+            }),
           ),
           const SizedBox(height: 12),
           Text(
-            'Produk Anda memiliki potensi tinggi karena keselarasan material dengan tren ramah lingkungan di USA.',
+            _string(exportReadiness, 'note').isEmpty
+                ? 'Produk Anda memiliki potensi tinggi berdasarkan data yang dikirim.'
+                : _string(exportReadiness, 'note'),
             style: AppTypography.bodySm.copyWith(
               color: AppColors.neutral08,
               height: 1.25,
@@ -436,132 +612,34 @@ class _ScoreCard extends StatelessWidget {
   }
 }
 
-class _ScoreSegment extends StatelessWidget {
-  const _ScoreSegment({required this.active});
+class _ActionRow extends StatelessWidget {
+  const _ActionRow({
+    required this.isSchedulingAnalysis,
+    required this.onAnalyze,
+    required this.onDesignReferences,
+  });
 
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        height: 7,
-        margin: const EdgeInsets.only(right: 8),
-        decoration: BoxDecoration(
-          color: active ? AppColors.primary04 : AppColors.neutral03,
-          borderRadius: BorderRadius.circular(8),
-        ),
-      ),
-    );
-  }
-}
-
-class _BrainsAdvice extends StatelessWidget {
-  const _BrainsAdvice();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
-      decoration: BoxDecoration(
-        color: AppColors.neutral02,
-        borderRadius: BorderRadius.circular(14),
-        border: const Border(
-          left: BorderSide(color: AppColors.primary04, width: 4),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: const BoxDecoration(
-              color: AppColors.primary04,
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: AppIcon(
-                AppIcons.brain(PhosphorIconsStyle.fill),
-                color: AppColors.primary08,
-                dimension: 18,
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Saran BrainStudio',
-                  style: AppTypography.bodySm.copyWith(
-                    color: AppColors.neutral08,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Tas anyaman Anda sangat potensial dengan nilai Estetika (94%) dan Material (88%) yang luar biasa. Cukup perbaiki tampilan kemasan dan luncurkan produk sebelum April untuk menyapu bersih puncak pasar summer di Amerika Serikat.',
-                  style: AppTypography.bodySm.copyWith(
-                    color: AppColors.neutral08,
-                    height: 1.25,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SentimentCard extends StatelessWidget {
-  const _SentimentCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return _AnalysisSectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          _SectionTitle(
-            icon: Icons.insert_chart_outlined,
-            title: 'Analisis Sentimen',
-          ),
-          SizedBox(height: 20),
-          _MetricBar(label: 'Estetika', value: 0.94, percent: '94%'),
-          SizedBox(height: 12),
-          _MetricBar(label: 'Material', value: 0.88, percent: '88%'),
-          SizedBox(height: 12),
-          _MetricBar(label: 'Kemasan', value: 0.72, percent: '72%'),
-          SizedBox(height: 18),
-          _DetailBox(),
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.icon, required this.title});
-
-  final IconData icon;
-  final String title;
+  final bool isSchedulingAnalysis;
+  final VoidCallback onAnalyze;
+  final VoidCallback onDesignReferences;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 18, color: AppColors.neutral09),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: AppTypography.headlineSm.copyWith(
-            color: AppColors.neutral09,
-            fontSize: 18,
+        Expanded(
+          child: AppButton(
+            label: 'Analisis Ulang',
+            variant: AppButtonVariant.ghost,
+            isLoading: isSchedulingAnalysis,
+            onPressed: onAnalyze,
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: AppButton(
+            label: 'Referensi Desain',
+            onPressed: onDesignReferences,
           ),
         ),
       ],
@@ -569,73 +647,139 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-class _MetricBar extends StatelessWidget {
-  const _MetricBar({
-    required this.label,
-    required this.percent,
-    required this.value,
+class _ExpandableSectionHeader extends StatelessWidget {
+  const _ExpandableSectionHeader({
+    required this.isExpanded,
+    required this.onTap,
   });
 
-  final String label;
-  final String percent;
-  final double value;
+  final bool isExpanded;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: AppTypography.bodySm.copyWith(
-                  color: AppColors.neutral08,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            Text(
-              percent,
-              style: AppTypography.bodySm.copyWith(
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: onTap,
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Detail Analisis',
+              style: AppTypography.bodyMd.copyWith(
                 color: AppColors.primary05,
-                fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: LinearProgressIndicator(
-            value: value,
-            minHeight: 8,
-            backgroundColor: AppColors.neutral03,
-            valueColor: const AlwaysStoppedAnimation<Color>(
-              AppColors.primary04,
+          ),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.neutral02,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.primary02),
+            ),
+            child: Center(
+              child: AppIcon(
+                isExpanded ? AppIcons.up() : AppIcons.dropdown(),
+                color: AppColors.primary05,
+                dimension: 18,
+              ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionRenderer extends StatelessWidget {
+  const _SectionRenderer({required this.sections});
+
+  final List<dynamic> sections;
+
+  @override
+  Widget build(BuildContext context) {
+    if (sections.isEmpty) {
+      return const _EmptySection(
+        title: 'Belum ada detail tambahan dari report ini.',
+      );
+    }
+
+    return Column(
+      children: sections.map((section) {
+        final map = _asMap(section);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: _SectionCard(child: _buildSection(map)),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildSection(Map<String, dynamic> section) {
+    final type = _string(section, 'type');
+    final title = _string(section, 'title');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title.isEmpty ? type : title,
+          style: AppTypography.headlineSm.copyWith(color: AppColors.neutral09),
         ),
+        const SizedBox(height: 14),
+        switch (type) {
+          'brainstorm' => _BulletItemList(items: _nestedItems(section)),
+          'sentiment_breakdown' => _MetricList(
+            items: _nestedItems(section),
+            metricKey: 'aspect',
+            valueKey: 'value',
+          ),
+          'seasonality' => _MetricList(
+            items: _nestedItems(section),
+            metricKey: 'month',
+            valueKey: 'value',
+          ),
+          'favorite_colors' => _MetricList(
+            items: _nestedItems(section),
+            metricKey: 'name',
+            valueKey: 'value',
+          ),
+          'popular_comments' => _ChipWrap(
+            items: _stringList(_listValue(section, 'items')),
+          ),
+          'pricing_reference' => _PricingList(items: _nestedItems(section)),
+          'opportunities' => _BulletItemList(items: _nestedItems(section)),
+          'sources' => _SourceList(items: _nestedItems(section)),
+          _ => Text(
+            _string(section, 'note').isEmpty
+                ? 'Tidak ada data tambahan.'
+                : _string(section, 'note'),
+            style: AppTypography.bodySm.copyWith(
+              color: AppColors.neutral08,
+              height: 1.35,
+            ),
+          ),
+        },
       ],
     );
   }
 }
 
-class _DetailBox extends StatelessWidget {
-  const _DetailBox();
+class _DesignReferencesSection extends StatelessWidget {
+  const _DesignReferencesSection({
+    required this.onOpenAll,
+    required this.references,
+  });
+
+  final VoidCallback onOpenAll;
+  final List<DesignReference> references;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.system01,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.neutral04),
-      ),
+    return _SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -643,284 +787,295 @@ class _DetailBox extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Rincian',
-                  style: AppTypography.bodySm.copyWith(
-                    color: AppColors.neutral08,
-                    fontWeight: FontWeight.w700,
+                  'Design References',
+                  style: AppTypography.headlineSm.copyWith(
+                    color: AppColors.neutral09,
                   ),
                 ),
               ),
-              AppIcon(AppIcons.up(), color: AppColors.neutral08, dimension: 14),
+              TextButton(
+                onPressed: onOpenAll,
+                child: const Text('Lihat semua'),
+              ),
             ],
           ),
-          const SizedBox(height: 14),
-          const _DetailParagraph(
-            title: 'Estetika',
-            text:
-                '94% Konsumen global menunjukkan sentimen positif tinggi terhadap estetika produk pada market saat ini',
-          ),
-          const _DetailParagraph(
-            title: 'Material',
-            text:
-                'Material produk di market global memperoleh tingkat kepuasan konsumen yang tinggi sebesar 88%',
-          ),
-          const _DetailParagraph(
-            title: 'Kemasan',
-            text:
-                '72% Sentimen konsumen terhadap kemasan masih menunjukkan adanya ruang improvisasi pada market global',
-          ),
+          const SizedBox(height: 12),
+          if (references.isEmpty)
+            const _EmptySection(
+              title: 'Belum ada design reference untuk analisis ini.',
+            )
+          else
+            Column(
+              children: references
+                  .map(
+                    (reference) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _ReferenceCard(reference: reference),
+                    ),
+                  )
+                  .toList(),
+            ),
         ],
       ),
     );
   }
 }
 
-class _DetailParagraph extends StatelessWidget {
-  const _DetailParagraph({required this.text, required this.title});
+class _ReferenceCard extends StatelessWidget {
+  const _ReferenceCard({required this.reference});
 
-  final String text;
-  final String title;
+  final DesignReference reference;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.neutral01,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.neutral03),
+      ),
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            title,
-            style: AppTypography.bodySm.copyWith(
-              color: AppColors.primary05,
-              fontWeight: FontWeight.w700,
-            ),
+            reference.title,
+            style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w700),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
-            text,
+            reference.description,
             style: AppTypography.bodySm.copyWith(
               color: AppColors.neutral08,
-              fontSize: 12,
-              height: 1.2,
+              height: 1.35,
             ),
           ),
+          const SizedBox(height: 10),
+          _ChipWrap(items: reference.tags),
         ],
       ),
     );
   }
 }
 
-class _SeasonCard extends StatelessWidget {
-  const _SeasonCard();
+class _PricingList extends StatelessWidget {
+  const _PricingList({required this.items});
+
+  final List<dynamic> items;
 
   @override
   Widget build(BuildContext context) {
-    return _AnalysisSectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SectionTitle(icon: AppIcons.season(), title: 'Musim Permintaan'),
-          const SizedBox(height: 28),
-          SizedBox(
-            height: 130,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: const [
-                _MonthBar(month: 'Jan', height: 48),
-                _MonthBar(month: 'Feb', height: 62),
-                _MonthBar(month: 'Mar', height: 84),
-                _MonthBar(month: 'Apr', height: 104, active: true),
-                _MonthBar(month: 'Mei', height: 104, active: true),
-                _MonthBar(month: 'Jun', height: 76),
+    if (items.isEmpty) {
+      return const _EmptySection(title: 'Tidak ada referensi harga.');
+    }
+
+    return Column(
+      children: items.map((item) {
+        final map = _asMap(item);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.neutral02,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _string(map, 'tier'),
+                  style: AppTypography.bodyMd.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _string(map, 'price_range'),
+                  style: AppTypography.bodySm.copyWith(
+                    color: AppColors.neutral08,
+                  ),
+                ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          Text(
-            'Permintaan memuncak pada bulan April-Mei di Amerika Serikat untuk kategori pakaian',
-            style: AppTypography.bodySm.copyWith(
-              color: AppColors.neutral08,
-              height: 1.25,
-            ),
-          ),
-        ],
-      ),
+        );
+      }).toList(),
     );
   }
 }
 
-class _MonthBar extends StatelessWidget {
-  const _MonthBar({
-    required this.height,
-    required this.month,
-    this.active = false,
+class _MetricList extends StatelessWidget {
+  const _MetricList({
+    required this.items,
+    required this.metricKey,
+    required this.valueKey,
   });
 
-  final bool active;
-  final double height;
-  final String month;
+  final List<dynamic> items;
+  final String metricKey;
+  final String valueKey;
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Container(
-            height: height,
-            margin: const EdgeInsets.symmetric(horizontal: 4),
-            decoration: BoxDecoration(
-              color: active ? AppColors.neutral03 : AppColors.neutral02,
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            month,
-            style: AppTypography.bodySm.copyWith(
-              color: active ? AppColors.primary05 : AppColors.neutral07,
-              fontSize: 10,
-              fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+    if (items.isEmpty) {
+      return const _EmptySection(title: 'Tidak ada metrik untuk ditampilkan.');
+    }
 
-class _FavoriteColorCard extends StatelessWidget {
-  const _FavoriteColorCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return const _AnalysisSectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SimpleSectionLabel('Warna Favorite'),
-          SizedBox(height: 18),
-          _ColorDemand(
-            color: Color(0xFF9A541C),
-            name: 'Earth Brown',
-            demand: '42% Permintaan',
-          ),
-          SizedBox(height: 12),
-          _ColorDemand(
-            color: Color(0xFFF4EFD4),
-            name: 'Natural Cream',
-            demand: '35% Permintaan',
-            bordered: true,
-          ),
-          SizedBox(height: 12),
-          _ColorDemand(
-            color: Color(0xFFA8B79A),
-            name: 'Sage',
-            demand: '23% Permintaan',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SimpleSectionLabel extends StatelessWidget {
-  const _SimpleSectionLabel(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: AppTypography.bodySm.copyWith(
-        color: AppColors.neutral08,
-        fontWeight: FontWeight.w700,
-      ),
-    );
-  }
-}
-
-class _ColorDemand extends StatelessWidget {
-  const _ColorDemand({
-    required this.color,
-    required this.demand,
-    required this.name,
-    this.bordered = false,
-  });
-
-  final bool bordered;
-  final Color color;
-  final String demand;
-  final String name;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(9),
-            border: bordered ? Border.all(color: AppColors.neutral05) : null,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              name,
-              style: AppTypography.bodySm.copyWith(
-                color: AppColors.neutral08,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            Text(
-              demand,
-              style: AppTypography.bodySm.copyWith(
-                color: AppColors.neutral07,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _PopularCommentsCard extends StatelessWidget {
-  const _PopularCommentsCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return _AnalysisSectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          _SimpleSectionLabel('Komentar Popular'),
-          SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 10,
+    return Column(
+      children: items.map((item) {
+        final map = _asMap(item);
+        final value = _num(map, valueKey).clamp(0.0, 1.0).toDouble();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _KeywordChip('Bahan Katun'),
-              _KeywordChip('Kemasan Cantik'),
-              _KeywordChip('Bagus'),
-              _KeywordChip('bentuk unik'),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _string(map, metricKey),
+                      style: AppTypography.bodySm.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${(value * 100).round()}%',
+                    style: AppTypography.bodySm.copyWith(
+                      color: AppColors.primary05,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: LinearProgressIndicator(
+                  value: value,
+                  minHeight: 8,
+                  backgroundColor: AppColors.neutral03,
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    AppColors.primary04,
+                  ),
+                ),
+              ),
             ],
           ),
-        ],
-      ),
+        );
+      }).toList(),
     );
   }
 }
 
-class _KeywordChip extends StatelessWidget {
-  const _KeywordChip(this.label);
+class _BulletItemList extends StatelessWidget {
+  const _BulletItemList({required this.items});
+
+  final List<dynamic> items;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return const _EmptySection(
+        title: 'Tidak ada item yang bisa ditampilkan.',
+      );
+    }
+
+    return Column(
+      children: items.map((item) {
+        final map = _asMap(item);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.neutral02,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _string(map, 'title').isEmpty
+                      ? _string(map, 'id')
+                      : _string(map, 'title'),
+                  style: AppTypography.bodyMd.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _string(map, 'content'),
+                  style: AppTypography.bodySm.copyWith(
+                    color: AppColors.neutral08,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _SourceList extends StatelessWidget {
+  const _SourceList({required this.items});
+
+  final List<dynamic> items;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return const _EmptySection(title: 'Tidak ada sumber data.');
+    }
+
+    return Column(
+      children: items.map((item) {
+        final map = _asMap(item);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Row(
+            children: [
+              const Icon(Icons.circle, size: 8, color: AppColors.primary04),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _string(map, 'name').isEmpty
+                      ? _string(map, 'product_id')
+                      : _string(map, 'name'),
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _ChipWrap extends StatelessWidget {
+  const _ChipWrap({required this.items});
+
+  final List<String> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: items.map((item) => _ChipLabel(item)).toList(),
+    );
+  }
+}
+
+class _ChipLabel extends StatelessWidget {
+  const _ChipLabel(this.label);
 
   final String label;
 
@@ -929,201 +1084,39 @@ class _KeywordChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.system01,
-        borderRadius: BorderRadius.circular(20),
+        color: AppColors.neutral02,
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.secondary08),
       ),
       child: Text(
         label,
         style: AppTypography.bodySm.copyWith(
           color: AppColors.neutral08,
+          fontWeight: FontWeight.w600,
           fontSize: 12,
-          fontWeight: FontWeight.w700,
         ),
       ),
     );
   }
 }
 
-class _PriceReferenceCard extends StatelessWidget {
-  const _PriceReferenceCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return _AnalysisSectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SectionTitle(icon: AppIcons.currency(), title: 'Referensi Harga'),
-          const SizedBox(height: 18),
-          Row(
-            children: const [
-              Expanded(
-                child: _PriceBox(title: 'Eksklusif', value: 'Rp1jt - Rp1,4jt'),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: _PriceBox(title: 'Umum', value: 'Rp280rb - 440rb'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Sentuhan Budaya Jogja',
-            style: AppTypography.bodySm.copyWith(
-              color: AppColors.primary05,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Padukan furing tas dengan motif Batik atau Lurik bernuansa Earth Brown dan Sage untuk menciptakan kesan handcrafted eksklusif yang sangat bernilai di pasar AS.',
-            style: AppTypography.bodySm.copyWith(
-              color: AppColors.neutral08,
-              height: 1.25,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PriceBox extends StatelessWidget {
-  const _PriceBox({required this.title, required this.value});
-
-  final String title;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.neutral02,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        children: [
-          Text(
-            title,
-            style: AppTypography.bodySm.copyWith(
-              color: AppColors.neutral07,
-              fontSize: 11,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: AppTypography.bodySm.copyWith(
-              color: AppColors.neutral08,
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _OpportunityCard extends StatelessWidget {
-  const _OpportunityCard({
-    required this.body,
-    required this.icon,
-    required this.title,
-  });
-
-  final String body;
-  final _OpportunityIcon icon;
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.neutral02,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.primary02),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: const BoxDecoration(
-              color: AppColors.primary04,
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: AppIcon(
-                icon.data,
-                color: AppColors.primary08,
-                dimension: 20,
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: AppTypography.bodySm.copyWith(
-                    color: AppColors.neutral08,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  body,
-                  style: AppTypography.bodySm.copyWith(
-                    color: AppColors.neutral08,
-                    height: 1.25,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-enum _OpportunityIcon { sparkle, truck }
-
-extension on _OpportunityIcon {
-  IconData get data {
-    return switch (this) {
-      _OpportunityIcon.sparkle => AppIcons.sparkle(),
-      _OpportunityIcon.truck => AppIcons.truck(),
-    };
-  }
-}
-
 class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.label, required this.tone});
+  const _StatusBadge({required this.label});
 
   final String label;
-  final _StatusTone tone;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: tone.background,
+        color: AppColors.primary04,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Text(
         label,
         style: AppTypography.bodySm.copyWith(
-          color: tone.foreground,
-          fontSize: 12,
+          color: AppColors.primary08,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -1131,28 +1124,30 @@ class _StatusBadge extends StatelessWidget {
   }
 }
 
-enum _StatusTone { ready, repair, notReady }
+class _EmptySection extends StatelessWidget {
+  const _EmptySection({required this.title});
 
-extension on _StatusTone {
-  Color get background {
-    return switch (this) {
-      _StatusTone.ready => AppColors.tertiary01,
-      _StatusTone.repair => AppColors.secondary01,
-      _StatusTone.notReady => AppColors.error02,
-    };
-  }
+  final String title;
 
-  Color get foreground {
-    return switch (this) {
-      _StatusTone.ready => AppColors.tertiary03,
-      _StatusTone.repair => AppColors.secondary05,
-      _StatusTone.notReady => AppColors.system01,
-    };
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.neutral02,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        title,
+        style: AppTypography.bodySm.copyWith(color: AppColors.neutral08),
+      ),
+    );
   }
 }
 
-class _AnalysisSectionCard extends StatelessWidget {
-  const _AnalysisSectionCard({required this.child});
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({required this.child});
 
   final Widget child;
 
@@ -1160,19 +1155,134 @@ class _AnalysisSectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
       decoration: BoxDecoration(
         color: AppColors.system01,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: const [
           BoxShadow(
             color: Color(0x127A5900),
-            blurRadius: 24,
-            offset: Offset(0, 12),
+            blurRadius: 18,
+            offset: Offset(0, 10),
           ),
         ],
       ),
       child: child,
     );
   }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.onRetry, required this.message});
+
+  final VoidCallback onRetry;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            AppButton(label: 'Coba lagi', onPressed: onRetry),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+void _openProfile(BuildContext context) {
+  Navigator.of(
+    context,
+  ).push(MaterialPageRoute<void>(builder: (context) => const ProfilePage()));
+}
+
+void _openNotifications(BuildContext context) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(builder: (context) => const NotificationPage()),
+  );
+}
+
+Map<String, dynamic>? _mapValue(Map<String, dynamic>? json, String key) {
+  if (json == null) {
+    return null;
+  }
+
+  final value = json[key];
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+
+  if (value is Map) {
+    return value.map((dynamic mapKey, dynamic mapValue) {
+      return MapEntry(mapKey.toString(), mapValue);
+    });
+  }
+
+  return null;
+}
+
+List<dynamic> _listValue(Map<String, dynamic>? json, String key) {
+  if (json == null) {
+    return const [];
+  }
+
+  final value = json[key];
+  if (value is List) {
+    return value;
+  }
+  return const [];
+}
+
+Map<String, dynamic> _asMap(dynamic value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+
+  if (value is Map) {
+    return value.map((dynamic mapKey, dynamic mapValue) {
+      return MapEntry(mapKey.toString(), mapValue);
+    });
+  }
+
+  return <String, dynamic>{};
+}
+
+String _string(Map<String, dynamic>? json, String key) {
+  if (json == null) {
+    return '';
+  }
+
+  final value = json[key];
+  return value == null ? '' : value.toString();
+}
+
+double _num(Map<String, dynamic>? json, String key) {
+  if (json == null) {
+    return 0;
+  }
+
+  final value = json[key];
+  if (value is num) {
+    return value.toDouble();
+  }
+
+  return double.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+List<String> _stringList(List<dynamic> items) {
+  return items.map((item) => item.toString()).toList();
+}
+
+List<dynamic> _nestedItems(Map<String, dynamic> section) {
+  final items = section['items'];
+  if (items is List) {
+    return items;
+  }
+  return const [];
 }

@@ -1,18 +1,37 @@
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/api/api_models.dart';
+import '../../core/api/api_repository.dart';
+import '../../core/api/app_session.dart';
 import '../../core/iconography/app_icons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../shared/widgets/app_bottom_navigation.dart';
 import '../../shared/widgets/app_button.dart';
 import '../analysis/analysis_input_page.dart';
+import '../analysis/analysis_result_page.dart';
 import '../brains/brain_studio_page.dart';
 import '../notifications/notification_page.dart';
 import '../profile/profile_page.dart';
 import '../reports/history_page.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  final _repository = ApiRepository();
+  late Future<_HomeData> _homeFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _homeFuture = _loadData();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,40 +40,71 @@ class HomePage extends StatelessWidget {
       body: SafeArea(
         child: Stack(
           children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(18, 28, 18, 118),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const _HomeHeader(),
-                  const SizedBox(height: 34),
-                  const _Greeting(),
-                  const SizedBox(height: 30),
-                  const _ExporterLevelCard(),
-                  const SizedBox(height: 26),
-                  _InsightCard(),
-                  const SizedBox(height: 32),
-                  _QuickActionGrid(),
-                  const SizedBox(height: 34),
-                  const _SectionHeader(),
-                  const SizedBox(height: 16),
-                  const _AnalysisCard(
-                    imagePath: 'assets/images/home/woven_bag.png',
-                    title: 'Tas Anyaman',
-                    country: 'Amerika Serikat',
-                    status: 'Siap Ekspor',
-                    statusColor: AppColors.tertiary02,
+            FutureBuilder<_HomeData>(
+              future: _homeFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return _HomeError(
+                    onRetry: _reload,
+                    message: _errorMessage(snapshot.error),
+                  );
+                }
+
+                final data = snapshot.data;
+                if (data == null) {
+                  return _HomeError(
+                    onRetry: _reload,
+                    message: 'Data beranda belum tersedia.',
+                  );
+                }
+
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(18, 28, 18, 118),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _HomeHeader(user: data.user),
+                      const SizedBox(height: 34),
+                      _Greeting(user: data.user),
+                      const SizedBox(height: 30),
+                      _ExporterLevelCard(products: data.products),
+                      const SizedBox(height: 26),
+                      _InsightCard(product: data.latestProduct),
+                      const SizedBox(height: 32),
+                      _QuickActionGrid(),
+                      const SizedBox(height: 34),
+                      _SectionHeader(productCount: data.products.length),
+                      const SizedBox(height: 16),
+                      if (data.products.isEmpty)
+                        const _EmptyProductsState()
+                      else
+                        Column(
+                          children: data.products.map((product) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: _AnalysisCard(
+                                product: product,
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (context) => AnalysisResultPage(
+                                        analysProductId: product.id,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  const _AnalysisCard(
-                    imagePath: 'assets/images/home/coffee_jacket.png',
-                    title: 'Kopi Luwak',
-                    country: 'Jepang',
-                    status: 'Lanjutkan Analisis',
-                    statusColor: AppColors.secondary04,
-                  ),
-                ],
-              ),
+                );
+              },
             ),
             Align(
               alignment: Alignment.bottomCenter,
@@ -77,6 +127,30 @@ class HomePage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<_HomeData> _loadData() async {
+    final user = AppSession.instance.currentUser ?? await _repository.me();
+    final products = await _repository.listAnalysisProducts();
+    return _HomeData(
+      latestProduct: products.isEmpty ? null : products.first,
+      products: products,
+      user: user,
+    );
+  }
+
+  Future<void> _reload() async {
+    setState(() {
+      _homeFuture = _loadData();
+    });
+  }
+
+  String _errorMessage(Object? error) {
+    if (error is ApiException) {
+      return error.message;
+    }
+
+    return 'Gagal memuat beranda.';
   }
 }
 
@@ -101,7 +175,9 @@ void _openBrains(BuildContext context) {
 }
 
 class _HomeHeader extends StatelessWidget {
-  const _HomeHeader();
+  const _HomeHeader({required this.user});
+
+  final ApiUser user;
 
   @override
   Widget build(BuildContext context) {
@@ -121,7 +197,7 @@ class _HomeHeader extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             onTap: () => _openProfile(context),
             child: Text(
-              'Arunika Tas',
+              user.companyName.isEmpty ? user.fullName : user.companyName,
               style: AppTypography.headlineSm.copyWith(
                 color: AppColors.neutral09,
               ),
@@ -173,12 +249,14 @@ void _openNotifications(BuildContext context) {
 }
 
 class _Greeting extends StatelessWidget {
-  const _Greeting();
+  const _Greeting({required this.user});
+
+  final ApiUser user;
 
   @override
   Widget build(BuildContext context) {
     return Text(
-      'Halo! Arunika Tas',
+      'Halo! ${user.fullName}',
       style: AppTypography.headlineLg.copyWith(
         color: AppColors.neutral09,
         height: 1.1,
@@ -188,14 +266,30 @@ class _Greeting extends StatelessWidget {
 }
 
 class _ExporterLevelCard extends StatelessWidget {
-  const _ExporterLevelCard();
+  const _ExporterLevelCard({required this.products});
+
+  final List<AnalysisProduct> products;
 
   @override
   Widget build(BuildContext context) {
+    final doneCount = products.where((product) => product.isDone).length;
+    final pendingCount = products.length - doneCount;
+    final progress = products.isEmpty ? 0.0 : doneCount / products.length;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
-      decoration: _softCardDecoration(borderRadius: 18),
+      decoration: BoxDecoration(
+        color: AppColors.system01,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x147A5900),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -203,7 +297,7 @@ class _ExporterLevelCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Level Eksportir Pemula',
+                  'Progress Analisis',
                   style: AppTypography.bodySm.copyWith(
                     color: AppColors.neutral09,
                     fontWeight: FontWeight.w600,
@@ -211,7 +305,7 @@ class _ExporterLevelCard extends StatelessWidget {
                 ),
               ),
               Text(
-                '60%',
+                '${(progress * 100).round()}%',
                 style: AppTypography.bodySm.copyWith(
                   color: AppColors.primary05,
                   fontWeight: FontWeight.w700,
@@ -222,16 +316,18 @@ class _ExporterLevelCard extends StatelessWidget {
           const SizedBox(height: 10),
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: const LinearProgressIndicator(
-              value: 0.6,
+            child: LinearProgressIndicator(
+              value: progress,
               minHeight: 12,
               backgroundColor: AppColors.neutral03,
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.secondary04),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                AppColors.secondary04,
+              ),
             ),
           ),
           const SizedBox(height: 10),
           Text(
-            '2 langkah lagi untuk naik ke Level Menengah!',
+            '$doneCount analisis selesai, $pendingCount masih diproses.',
             style: AppTypography.bodySm.copyWith(
               color: AppColors.neutral08,
               height: 1.2,
@@ -244,10 +340,18 @@ class _ExporterLevelCard extends StatelessWidget {
 }
 
 class _InsightCard extends StatelessWidget {
-  const _InsightCard();
+  const _InsightCard({required this.product});
+
+  final AnalysisProduct? product;
 
   @override
   Widget build(BuildContext context) {
+    final title = product == null
+        ? 'Belum ada analisis yang dibuat. Mulai dari form analisis sekarang.'
+        : product!.isDone
+        ? 'Analisis terakhir sudah siap. Buka detail untuk melihat report dan referensi desain.'
+        : 'Analisis terakhir sedang diproses. Cek lagi sebentar lagi.';
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(22, 22, 22, 22),
@@ -287,7 +391,7 @@ class _InsightCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Minat kerajinan di pasar global sedang naik daun. Ayo cek kesiapan produkmu!',
+                  title,
                   style: AppTypography.headlineSm.copyWith(
                     color: AppColors.neutral09,
                     height: 1.35,
@@ -295,9 +399,23 @@ class _InsightCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 AppButton(
-                  label: 'Analisis sekarang',
+                  label: product == null
+                      ? 'Mulai analisis'
+                      : 'Lihat hasil terakhir',
                   size: AppButtonSize.sm,
-                  onPressed: () => _openAnalysis(context),
+                  onPressed: () {
+                    if (product == null) {
+                      _openAnalysis(context);
+                      return;
+                    }
+
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (context) =>
+                            AnalysisResultPage(analysProductId: product!.id),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -324,17 +442,19 @@ class _QuickActionGrid extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
-        const Expanded(
+        Expanded(
           child: _QuickActionTile(
             icon: _QuickActionIcon.brain,
             label: 'Brain Studio',
+            onTap: () => _openBrains(context),
           ),
         ),
         const SizedBox(width: 10),
-        const Expanded(
+        Expanded(
           child: _QuickActionTile(
             icon: _QuickActionIcon.report,
             label: 'LaporanKu',
+            onTap: () => _openReports(context),
           ),
         ),
       ],
@@ -415,7 +535,9 @@ extension on _QuickActionIcon {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader();
+  const _SectionHeader({required this.productCount});
+
+  final int productCount;
 
   @override
   Widget build(BuildContext context) {
@@ -423,18 +545,16 @@ class _SectionHeader extends StatelessWidget {
       children: [
         Expanded(
           child: Text(
-            'Analisis Terakhir',
-            style: AppTypography.headlineSm.copyWith(
+            'Analisis Terbaru',
+            style: AppTypography.bodyMd.copyWith(
               color: AppColors.neutral09,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),
         Text(
-          'Lihat Semua',
-          style: AppTypography.bodySm.copyWith(
-            color: AppColors.primary05,
-            fontWeight: FontWeight.w700,
-          ),
+          '$productCount item',
+          style: AppTypography.bodySm.copyWith(color: AppColors.neutral08),
         ),
       ],
     );
@@ -442,120 +562,183 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _AnalysisCard extends StatelessWidget {
-  const _AnalysisCard({
-    required this.country,
-    required this.imagePath,
-    required this.status,
-    required this.statusColor,
-    required this.title,
-  });
+  const _AnalysisCard({required this.onTap, required this.product});
 
-  final String country;
-  final String imagePath;
-  final String status;
-  final Color statusColor;
-  final String title;
+  final VoidCallback onTap;
+  final AnalysisProduct product;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 112,
-      padding: const EdgeInsets.all(16),
-      decoration: _softCardDecoration(borderRadius: 18),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: Image.asset(
-              imagePath,
-              width: 80,
-              height: 80,
-              fit: BoxFit.cover,
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+        decoration: BoxDecoration(
+          color: AppColors.system01,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x127A5900),
+              blurRadius: 22,
+              offset: Offset(0, 10),
             ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.headlineSm.copyWith(
-                    color: AppColors.neutral09,
-                  ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                color: AppColors.primary04,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Center(
+                child: AppIcon(
+                  AppIcons.document(),
+                  color: AppColors.primary08,
+                  dimension: 24,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  country,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.bodySm.copyWith(
-                    color: AppColors.neutral08,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: statusColor,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        status,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.bodySm.copyWith(
-                          color: statusColor,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          Container(
-            width: 40,
-            height: 40,
-            decoration: const BoxDecoration(
-              color: AppColors.neutral03,
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: AppIcon(
-                AppIcons.arrowRight(),
-                color: AppColors.primary05,
-                dimension: 18,
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          product.productName,
+                          style: AppTypography.bodyMd.copyWith(
+                            color: AppColors.neutral09,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      _StatusDot(status: product.status),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    product.category,
+                    style: AppTypography.bodySm.copyWith(
+                      color: AppColors.neutral08,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    product.description,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.bodySm.copyWith(
+                      color: AppColors.neutral08,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      AppButton(
+                        label: product.isDone ? 'Buka hasil' : 'Tunggu hasil',
+                        size: AppButtonSize.sm,
+                        onPressed: onTap,
+                      ),
+                      const SizedBox(width: 10),
+                      if (product.isProcessing)
+                        Text(
+                          product.message ?? 'Sedang diproses',
+                          style: AppTypography.bodySm.copyWith(
+                            color: AppColors.neutral08,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-BoxDecoration _softCardDecoration({required double borderRadius}) {
-  return BoxDecoration(
-    color: AppColors.system01,
-    borderRadius: BorderRadius.circular(borderRadius),
-    boxShadow: const [
-      BoxShadow(
-        color: Color(0x127A5900),
-        blurRadius: 24,
-        offset: Offset(0, 12),
+class _StatusDot extends StatelessWidget {
+  const _StatusDot({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = status.toLowerCase() == 'done'
+        ? AppColors.tertiary02
+        : AppColors.secondary04;
+
+    return Container(
+      width: 10,
+      height: 10,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    );
+  }
+}
+
+class _EmptyProductsState extends StatelessWidget {
+  const _EmptyProductsState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.system01,
+        borderRadius: BorderRadius.circular(18),
       ),
-    ],
-  );
+      child: Text(
+        'Belum ada data analisis. Coba buat analisis pertama dari tombol di atas.',
+        style: AppTypography.bodySm.copyWith(color: AppColors.neutral08),
+      ),
+    );
+  }
+}
+
+class _HomeError extends StatelessWidget {
+  const _HomeError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            AppButton(label: 'Coba lagi', onPressed: onRetry),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeData {
+  const _HomeData({
+    required this.latestProduct,
+    required this.products,
+    required this.user,
+  });
+
+  final AnalysisProduct? latestProduct;
+  final List<AnalysisProduct> products;
+  final ApiUser user;
 }

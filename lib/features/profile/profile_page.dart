@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/api/api_models.dart';
+import '../../core/api/api_repository.dart';
 import '../../core/iconography/app_icons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -20,10 +23,20 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  final _repository = ApiRepository();
+  late Future<ApiUser> _userFuture;
+
   bool _isEditing = false;
+  bool _isLoggingOut = false;
   String _city = 'Sleman';
   String _district = 'Mlati';
   String _province = 'DI Yogyakarta';
+
+  @override
+  void initState() {
+    super.initState();
+    _userFuture = _repository.me();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,169 +45,185 @@ class _ProfilePageState extends State<ProfilePage> {
       body: SafeArea(
         child: Stack(
           children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 28, 20, 130),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const _ProfileHeader(),
-                  const SizedBox(height: 34),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: _EditProfileButton(
-                      isEditing: _isEditing,
-                      onTap: () => setState(() => _isEditing = true),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const _ProfileIdentity(),
-                  const SizedBox(height: 34),
-                  _ProfileSection(
-                    title: 'Informasi Akun',
+            FutureBuilder<ApiUser>(
+              future: _userFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return _ProfileError(
+                    message: _errorMessage(snapshot.error),
+                    onRetry: _reload,
+                  );
+                }
+
+                final user = snapshot.data;
+                if (user == null) {
+                  return _ProfileError(
+                    message: 'Profil kosong.',
+                    onRetry: _reload,
+                  );
+                }
+
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 28, 20, 130),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const _ProfileTextField(
-                        label: 'Nama Lengkap',
-                        value: 'Khanirani Nuraddawiya',
+                      _ProfileHeader(user: user),
+                      const SizedBox(height: 34),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: _EditProfileButton(
+                          isEditing: _isEditing,
+                          onTap: () => setState(() => _isEditing = true),
+                        ),
                       ),
-                      const SizedBox(height: 20),
-                      const _ProfileTextField(
-                        label: 'Email Bisnis',
-                        value: 'arunika@gmail.com',
+                      const SizedBox(height: 8),
+                      _ProfileIdentity(user: user),
+                      const SizedBox(height: 34),
+                      _ProfileSection(
+                        title: 'Informasi Akun',
+                        children: [
+                          _ProfileTextField(
+                            label: 'Nama Lengkap',
+                            value: user.fullName,
+                          ),
+                          const SizedBox(height: 20),
+                          _ProfileTextField(
+                            label: 'Email Bisnis',
+                            value: user.email,
+                          ),
+                          const SizedBox(height: 20),
+                          _ProfileTextField(
+                            label: 'Password',
+                            value: '********',
+                            obscureAction: true,
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 20),
-                      const _ProfileTextField(
-                        label: 'Password',
-                        value: '********',
-                        obscureAction: true,
+                      const SizedBox(height: 36),
+                      _ProfileSection(
+                        title: 'Informasi UMKM',
+                        children: [
+                          _ProfileTextField(
+                            label: 'Nama UMKM',
+                            value: user.companyName,
+                          ),
+                          const SizedBox(height: 20),
+                          _ProfileDropdownField(
+                            label: 'Provinsi',
+                            value: _province,
+                            items: const [
+                              'DI Yogyakarta',
+                              'Jawa Timur',
+                              'Sumatera Utara',
+                              'Sulawesi Selatan',
+                            ],
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => _province = value);
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _ProfileDropdownField(
+                                  label: 'Kota/Kabupaten',
+                                  value: _city,
+                                  items: const [
+                                    'Sleman',
+                                    'Bantul',
+                                    'Yogyakarta',
+                                    'Surabaya',
+                                  ],
+                                  onChanged: (value) {
+                                    if (value != null) {
+                                      setState(() => _city = value);
+                                    }
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: _ProfileDropdownField(
+                                  label: 'Kecamatan',
+                                  value: _district,
+                                  items: const [
+                                    'Mlati',
+                                    'Berbah',
+                                    'Depok',
+                                    'Gamping',
+                                  ],
+                                  onChanged: (value) {
+                                    if (value != null) {
+                                      setState(() => _district = value);
+                                    }
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+                          _ProfileTextField(
+                            label: 'Alamat Lengkap',
+                            value: user.phone.isEmpty
+                                ? 'Alamat belum tersedia'
+                                : user.phone,
+                          ),
+                        ],
                       ),
                       if (_isEditing) ...[
-                        const SizedBox(height: 20),
-                        const _ProfileTextField(
-                          label: 'Konfirmasi Password',
-                          value: '********',
-                          obscureAction: true,
+                        const SizedBox(height: 32),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: AppButton(
+                                label: 'Batal',
+                                variant: AppButtonVariant.ghost,
+                                onPressed: () {
+                                  setState(() => _isEditing = false);
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 18),
+                            Expanded(
+                              child: AppButton(
+                                label: 'Simpan Perubahan',
+                                size: AppButtonSize.lg,
+                                onPressed: () {
+                                  setState(() => _isEditing = false);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Profil belum punya endpoint update, jadi perubahan hanya lokal.',
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
                         ),
                       ],
-                    ],
-                  ),
-                  const SizedBox(height: 36),
-                  _ProfileSection(
-                    title: 'Informasi UMKM',
-                    children: [
-                      const _ProfileTextField(
-                        label: 'Nama UMKM',
-                        value: 'Arunika Tas',
-                      ),
-                      const SizedBox(height: 20),
-                      _ProfileDropdownField(
-                        label: 'Provinsi',
-                        value: _province,
-                        items: const [
-                          'DI Yogyakarta',
-                          'Jawa Timur',
-                          'Sumatera Utara',
-                          'Sulawesi Selatan',
-                        ],
-                        onChanged: (value) {
-                          if (value != null) {
-                            setState(() => _province = value);
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _ProfileDropdownField(
-                              label: 'Kota/Kabupaten',
-                              value: _city,
-                              items: const [
-                                'Sleman',
-                                'Bantul',
-                                'Yogyakarta',
-                                'Surabaya',
-                              ],
-                              onChanged: (value) {
-                                if (value != null) {
-                                  setState(() => _city = value);
-                                }
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _ProfileDropdownField(
-                              label: 'Kecamatan',
-                              value: _district,
-                              items: const [
-                                'Mlati',
-                                'Berbah',
-                                'Depok',
-                                'Gamping',
-                              ],
-                              onChanged: (value) {
-                                if (value != null) {
-                                  setState(() => _district = value);
-                                }
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      const _ProfileTextField(
-                        label: 'Alamat Lengkap',
-                        value: 'Jalan rindu, Sendadi, Jogoboyoo Limo',
+                      const SizedBox(height: 24),
+                      AppButton(
+                        label: 'Logout',
+                        isFullWidth: true,
+                        isLoading: _isLoggingOut,
+                        variant: AppButtonVariant.danger,
+                        onPressed: _isLoggingOut
+                            ? null
+                            : () => _logout(context),
                       ),
                     ],
                   ),
-                  if (_isEditing) ...[
-                    const SizedBox(height: 32),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: AppButton(
-                            label: 'Batal',
-                            variant: AppButtonVariant.ghost,
-                            onPressed: () {
-                              setState(() => _isEditing = false);
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 18),
-                        Expanded(
-                          child: AppButton(
-                            label: 'Simpan Perubahan',
-                            size: AppButtonSize.lg,
-                            onPressed: () {
-                              setState(() => _isEditing = false);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Perubahan profil disimpan.'),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-                  AppButton(
-                    label: 'Logout',
-                    isFullWidth: true,
-                    variant: AppButtonVariant.danger,
-                    onPressed: () {
-                      Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute<void>(
-                          builder: (context) => const LoginPage(),
-                        ),
-                        (route) => false,
-                      );
-                    },
-                  ),
-                ],
-              ),
+                );
+              },
             ),
             Align(
               alignment: Alignment.bottomCenter,
@@ -233,6 +262,50 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
   }
+
+  Future<void> _reload() async {
+    setState(() {
+      _userFuture = _repository.me();
+    });
+  }
+
+  Future<void> _logout(BuildContext context) async {
+    setState(() => _isLoggingOut = true);
+
+    try {
+      await _repository.logout();
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(builder: (context) => const LoginPage()),
+        (route) => false,
+      );
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message.isEmpty ? 'Logout gagal' : error.message),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoggingOut = false);
+      }
+    }
+  }
+
+  String _errorMessage(Object? error) {
+    if (error is ApiException) {
+      return error.message;
+    }
+
+    return 'Gagal memuat profil.';
+  }
 }
 
 class _ProfileDropdownField extends StatelessWidget {
@@ -269,7 +342,9 @@ class _ProfileDropdownField extends StatelessWidget {
 }
 
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader();
+  const _ProfileHeader({required this.user});
+
+  final ApiUser user;
 
   @override
   Widget build(BuildContext context) {
@@ -282,7 +357,7 @@ class _ProfileHeader extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: Text(
-            'Arunika Tas',
+            user.companyName.isEmpty ? user.fullName : user.companyName,
             style: AppTypography.headlineSm.copyWith(
               color: AppColors.neutral09,
             ),
@@ -357,7 +432,9 @@ class _EditProfileButton extends StatelessWidget {
 }
 
 class _ProfileIdentity extends StatelessWidget {
-  const _ProfileIdentity();
+  const _ProfileIdentity({required this.user});
+
+  final ApiUser user;
 
   @override
   Widget build(BuildContext context) {
@@ -404,7 +481,7 @@ class _ProfileIdentity extends StatelessWidget {
         const SizedBox(height: 16),
         Center(
           child: Text(
-            'Arunika Tas',
+            user.fullName,
             style: AppTypography.headlineMd.copyWith(
               color: AppColors.neutral09,
             ),
@@ -428,24 +505,10 @@ class _ProfileSection extends StatelessWidget {
       children: [
         Text(
           title,
-          style: AppTypography.bodyMd.copyWith(
-            color: AppColors.primary05,
-            fontWeight: FontWeight.w700,
-          ),
+          style: AppTypography.headlineSm.copyWith(color: AppColors.neutral09),
         ),
-        const SizedBox(height: 12),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AppColors.system01,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: children,
-          ),
-        ),
+        const SizedBox(height: 18),
+        Column(children: children),
       ],
     );
   }
@@ -458,8 +521,8 @@ class _ProfileTextField extends StatelessWidget {
     this.obscureAction = false,
   });
 
-  final String label;
   final bool obscureAction;
+  final String label;
   final String value;
 
   @override
@@ -469,51 +532,50 @@ class _ProfileTextField extends StatelessWidget {
       children: [
         Text(
           label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: AppTypography.bodyMd.copyWith(
+          style: AppTypography.bodySm.copyWith(
             color: AppColors.neutral08,
             fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         Container(
-          height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           decoration: BoxDecoration(
             color: AppColors.tertiary05,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: AppColors.tertiary06),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x0A201B11),
-                blurRadius: 8,
-                offset: Offset(0, 2),
-              ),
-            ],
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.bodySm.copyWith(
-                    color: AppColors.neutral08,
-                  ),
-                ),
-              ),
-              if (obscureAction)
-                AppIcon(
-                  AppIcons.eye(),
-                  color: AppColors.system05,
-                  dimension: 18,
-                ),
-            ],
+          child: Text(
+            obscureAction ? '********' : value,
+            style: AppTypography.bodySm.copyWith(color: AppColors.neutral08),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ProfileError extends StatelessWidget {
+  const _ProfileError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            AppButton(label: 'Coba lagi', onPressed: onRetry),
+          ],
+        ),
+      ),
     );
   }
 }

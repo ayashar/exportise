@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/api/api_repository.dart';
 import '../../core/iconography/app_icons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
-import '../home/home_page.dart';
+import '../../shared/widgets/app_button.dart';
 import 'login_page.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -14,10 +16,27 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
+  final _companyController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _fullNameController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _repository = ApiRepository();
+
   int _step = 0;
-  String? _province;
-  String? _city;
-  String? _district;
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _companyController.dispose();
+    _emailController.dispose();
+    _fullNameController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,20 +89,18 @@ class _RegisterPageState extends State<RegisterPage> {
                   duration: const Duration(milliseconds: 180),
                   child: _step == 0
                       ? _RegisterAccountStep(
+                          companyController: _companyController,
+                          confirmPasswordController: _confirmPasswordController,
+                          emailController: _emailController,
+                          fullNameController: _fullNameController,
                           onNext: () => setState(() => _step = 1),
+                          passwordController: _passwordController,
                         )
                       : _RegisterBusinessStep(
-                          city: _city,
-                          district: _district,
-                          province: _province,
-                          onCityChanged: (value) =>
-                              setState(() => _city = value),
-                          onDistrictChanged: (value) {
-                            setState(() => _district = value);
-                          },
-                          onProvinceChanged: (value) {
-                            setState(() => _province = value);
-                          },
+                          isLoading: _isLoading,
+                          onBack: () => setState(() => _step = 0),
+                          onSubmit: () => _register(context),
+                          phoneController: _phoneController,
                         ),
                 ),
               ),
@@ -95,12 +112,82 @@ class _RegisterPageState extends State<RegisterPage> {
       ),
     );
   }
+
+  Future<void> _register(BuildContext context) async {
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password dan konfirmasi harus sama.')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await _repository.register(
+        companyName: _companyController.text.trim(),
+        email: _emailController.text.trim(),
+        fullName: _fullNameController.text.trim(),
+        password: _passwordController.text,
+        phone: _phoneController.text.trim(),
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Akun berhasil dibuat. Silakan masuk.')),
+      );
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(builder: (context) => const LoginPage()),
+        (route) => false,
+      );
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.message.isEmpty ? 'Registrasi gagal' : error.message,
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Registrasi gagal. Coba lagi.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 }
 
 class _RegisterAccountStep extends StatelessWidget {
-  const _RegisterAccountStep({required this.onNext});
+  const _RegisterAccountStep({
+    required this.companyController,
+    required this.confirmPasswordController,
+    required this.emailController,
+    required this.fullNameController,
+    required this.onNext,
+    required this.passwordController,
+  });
 
+  final TextEditingController companyController;
+  final TextEditingController confirmPasswordController;
+  final TextEditingController emailController;
+  final TextEditingController fullNameController;
   final VoidCallback onNext;
+  final TextEditingController passwordController;
 
   @override
   Widget build(BuildContext context) {
@@ -109,30 +196,45 @@ class _RegisterAccountStep extends StatelessWidget {
       children: [
         const StepDots(activeStep: 0, totalSteps: 2),
         const SizedBox(height: 32),
-        const AuthTextField(
+        AuthTextField(
+          controller: fullNameController,
           label: 'Nama Lengkap',
           hintText: 'Masukan nama lengkap',
         ),
         const SizedBox(height: 20),
-        const AuthTextField(
+        AuthTextField(
+          controller: emailController,
           label: 'Email Bisnis',
           hintText: 'contoh@bisnis.com',
           keyboardType: TextInputType.emailAddress,
         ),
         const SizedBox(height: 20),
-        const AuthTextField(
+        AuthTextField(
+          controller: companyController,
+          label: 'Nama UMKM',
+          hintText: 'Nama usaha Anda',
+        ),
+        const SizedBox(height: 20),
+        AuthTextField(
+          controller: passwordController,
           label: 'Password',
           hintText: 'Minimal 8 karakter',
           obscureText: true,
         ),
         const SizedBox(height: 20),
-        const AuthTextField(
+        AuthTextField(
+          controller: confirmPasswordController,
           label: 'Konfirmasi Password',
           hintText: 'Masukan kembali password',
           obscureText: true,
         ),
         const SizedBox(height: 32),
-        AuthPrimaryButton(label: 'Selanjutnya', onPressed: onNext),
+        AppButton(
+          label: 'Selanjutnya',
+          isFullWidth: true,
+          size: AppButtonSize.lg,
+          onPressed: onNext,
+        ),
         const SizedBox(height: 16),
         AuthLinkRow(
           text: 'Sudah punya akun?',
@@ -146,20 +248,16 @@ class _RegisterAccountStep extends StatelessWidget {
 
 class _RegisterBusinessStep extends StatelessWidget {
   const _RegisterBusinessStep({
-    required this.city,
-    required this.district,
-    required this.onCityChanged,
-    required this.onDistrictChanged,
-    required this.onProvinceChanged,
-    required this.province,
+    required this.isLoading,
+    required this.onBack,
+    required this.onSubmit,
+    required this.phoneController,
   });
 
-  final String? city;
-  final String? district;
-  final ValueChanged<String?> onCityChanged;
-  final ValueChanged<String?> onDistrictChanged;
-  final ValueChanged<String?> onProvinceChanged;
-  final String? province;
+  final bool isLoading;
+  final VoidCallback onBack;
+  final VoidCallback onSubmit;
+  final TextEditingController phoneController;
 
   @override
   Widget build(BuildContext context) {
@@ -168,52 +266,35 @@ class _RegisterBusinessStep extends StatelessWidget {
       children: [
         const StepDots(activeStep: 1, totalSteps: 2),
         const SizedBox(height: 32),
-        const AuthTextField(label: 'Nama UMKM', hintText: 'Nama usaha Anda'),
-        const SizedBox(height: 20),
-        AuthDropdownField(
-          label: 'Provinsi',
-          hintText: 'Pilih Provinsi',
-          value: province,
-          items: const ['Yogyakarta', 'DI Yogyakarta', 'Jawa Tengah'],
-          onChanged: onProvinceChanged,
+        AuthTextField(
+          controller: phoneController,
+          label: 'Nomor Telepon',
+          hintText: '08xxxxxxxxxx',
+          keyboardType: TextInputType.phone,
         ),
         const SizedBox(height: 20),
-        Row(
-          children: [
-            Expanded(
-              child: AuthDropdownField(
-                label: 'Kota/Kabupaten',
-                hintText: 'Pilih...',
-                value: city,
-                items: const ['Sleman', 'Bantul', 'Yogyakarta'],
-                onChanged: onCityChanged,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: AuthDropdownField(
-                label: 'Kecamatan/Distrik',
-                hintText: 'Pilih...',
-                value: district,
-                items: const ['Berbah', 'Mlati', 'Depok'],
-                onChanged: onDistrictChanged,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        const AuthTextField(
-          label: 'Alamat Lengkap',
-          hintText: 'Masukan Alamat',
+        Text(
+          'Kontrak API saat ini hanya memakai identitas utama dan nomor telepon. Field tambahan untuk alamat belum tersedia di backend.',
+          style: AppTypography.bodySm.copyWith(
+            color: AppColors.neutral08,
+            height: 1.4,
+          ),
         ),
         const SizedBox(height: 32),
-        AuthPrimaryButton(
+        AppButton(
           label: 'Daftar',
-          onPressed: () {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute<void>(builder: (context) => const HomePage()),
-            );
-          },
+          isFullWidth: true,
+          isLoading: isLoading,
+          size: AppButtonSize.lg,
+          onPressed: isLoading ? null : onSubmit,
+        ),
+        const SizedBox(height: 16),
+        AppButton(
+          label: 'Kembali',
+          isFullWidth: true,
+          variant: AppButtonVariant.ghost,
+          size: AppButtonSize.lg,
+          onPressed: onBack,
         ),
         const SizedBox(height: 16),
         AuthLinkRow(
