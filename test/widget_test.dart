@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:eksportise_frontend/core/iconography/app_icons.dart';
-import 'package:eksportise_frontend/main.dart';
+import 'package:exportise/core/iconography/app_icons.dart';
+import 'package:exportise/main.dart';
 
 void main() {
   testWidgets('Onboarding flow appears before auth', (

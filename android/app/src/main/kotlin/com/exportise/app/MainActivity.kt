@@ -1,4 +1,4 @@
-package com.example.eksportise_frontend
+package com.exportise.app
 
 import io.flutter.embedding.android.FlutterActivity
 
