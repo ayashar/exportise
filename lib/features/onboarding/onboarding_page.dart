@@ -130,7 +130,7 @@ class _IntroOnboardingPage extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         Text(
-          'Tapi kamu perlu tahu apa yang diinginkan pembeli di sana. Eksportise bantu kamu riset pasar hanya dalam 15 menit.',
+          'Tapi kamu perlu tahu apa yang diinginkan pembeli di sana. Exportise bantu kamu riset pasar hanya dalam 15 menit.',
           style: AppTypography.bodyMd.copyWith(
             color: AppColors.neutral08,
             height: 1.45,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/api_repository.dart';
@@ -22,10 +23,14 @@ class _RegisterPageState extends State<RegisterPage> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _addressController = TextEditingController();
   final _repository = ApiRepository();
 
   int _step = 0;
   bool _isLoading = false;
+  String? _city;
+  String? _district;
+  String? _province;
 
   @override
   void dispose() {
@@ -35,6 +40,7 @@ class _RegisterPageState extends State<RegisterPage> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _phoneController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 
@@ -76,7 +82,7 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               const SizedBox(height: 10),
               Text(
-                'Bergabunglah dengan ribuan UMKM yang\ntelah go-global bersama Eksportise.',
+                'Bergabunglah dengan ribuan UMKM yang\ntelah go-global bersama Exportise.',
                 textAlign: TextAlign.center,
                 style: AppTypography.bodyMd.copyWith(
                   color: AppColors.neutral08,
@@ -89,7 +95,6 @@ class _RegisterPageState extends State<RegisterPage> {
                   duration: const Duration(milliseconds: 180),
                   child: _step == 0
                       ? _RegisterAccountStep(
-                          companyController: _companyController,
                           confirmPasswordController: _confirmPasswordController,
                           emailController: _emailController,
                           fullNameController: _fullNameController,
@@ -97,10 +102,24 @@ class _RegisterPageState extends State<RegisterPage> {
                           passwordController: _passwordController,
                         )
                       : _RegisterBusinessStep(
+                          addressController: _addressController,
+                          city: _city,
+                          companyController: _companyController,
+                          district: _district,
                           isLoading: _isLoading,
                           onBack: () => setState(() => _step = 0),
+                          onCityChanged: (value) {
+                            setState(() => _city = value);
+                          },
+                          onDistrictChanged: (value) {
+                            setState(() => _district = value);
+                          },
+                          onProvinceChanged: (value) {
+                            setState(() => _province = value);
+                          },
                           onSubmit: () => _register(context),
                           phoneController: _phoneController,
+                          province: _province,
                         ),
                 ),
               ),
@@ -114,6 +133,8 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _register(BuildContext context) async {
+    final phone = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+
     if (_passwordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Password dan konfirmasi harus sama.')),
@@ -129,7 +150,7 @@ class _RegisterPageState extends State<RegisterPage> {
         email: _emailController.text.trim(),
         fullName: _fullNameController.text.trim(),
         password: _passwordController.text,
-        phone: _phoneController.text.trim(),
+        phone: phone,
       );
 
       if (!context.mounted) {
@@ -174,7 +195,6 @@ class _RegisterPageState extends State<RegisterPage> {
 
 class _RegisterAccountStep extends StatelessWidget {
   const _RegisterAccountStep({
-    required this.companyController,
     required this.confirmPasswordController,
     required this.emailController,
     required this.fullNameController,
@@ -182,7 +202,6 @@ class _RegisterAccountStep extends StatelessWidget {
     required this.passwordController,
   });
 
-  final TextEditingController companyController;
   final TextEditingController confirmPasswordController;
   final TextEditingController emailController;
   final TextEditingController fullNameController;
@@ -207,12 +226,6 @@ class _RegisterAccountStep extends StatelessWidget {
           label: 'Email Bisnis',
           hintText: 'contoh@bisnis.com',
           keyboardType: TextInputType.emailAddress,
-        ),
-        const SizedBox(height: 20),
-        AuthTextField(
-          controller: companyController,
-          label: 'Nama UMKM',
-          hintText: 'Nama usaha Anda',
         ),
         const SizedBox(height: 20),
         AuthTextField(
@@ -248,16 +261,32 @@ class _RegisterAccountStep extends StatelessWidget {
 
 class _RegisterBusinessStep extends StatelessWidget {
   const _RegisterBusinessStep({
+    required this.addressController,
+    required this.city,
+    required this.companyController,
+    required this.district,
     required this.isLoading,
     required this.onBack,
+    required this.onCityChanged,
+    required this.onDistrictChanged,
+    required this.onProvinceChanged,
     required this.onSubmit,
     required this.phoneController,
+    required this.province,
   });
 
+  final TextEditingController addressController;
+  final String? city;
+  final TextEditingController companyController;
+  final String? district;
   final bool isLoading;
   final VoidCallback onBack;
+  final ValueChanged<String?> onCityChanged;
+  final ValueChanged<String?> onDistrictChanged;
+  final ValueChanged<String?> onProvinceChanged;
   final VoidCallback onSubmit;
   final TextEditingController phoneController;
+  final String? province;
 
   @override
   Widget build(BuildContext context) {
@@ -267,18 +296,60 @@ class _RegisterBusinessStep extends StatelessWidget {
         const StepDots(activeStep: 1, totalSteps: 2),
         const SizedBox(height: 32),
         AuthTextField(
+          controller: companyController,
+          label: 'Nama UMKM',
+          hintText: 'Nama usaha Anda',
+        ),
+        const SizedBox(height: 20),
+        AuthTextField(
           controller: phoneController,
           label: 'Nomor Telepon',
           hintText: '08xxxxxxxxxx',
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           keyboardType: TextInputType.phone,
         ),
         const SizedBox(height: 20),
-        Text(
-          'Kontrak API saat ini hanya memakai identitas utama dan nomor telepon. Field tambahan untuk alamat belum tersedia di backend.',
-          style: AppTypography.bodySm.copyWith(
-            color: AppColors.neutral08,
-            height: 1.4,
-          ),
+        AuthDropdownField(
+          hintText: 'Pilih Provinsi',
+          items: const [
+            'DI Yogyakarta',
+            'Jawa Timur',
+            'Sumatera Utara',
+            'Sulawesi Selatan',
+          ],
+          label: 'Provinsi',
+          onChanged: onProvinceChanged,
+          value: province,
+        ),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(
+              child: AuthDropdownField(
+                hintText: 'Pilih...',
+                items: const ['Sleman', 'Bantul', 'Yogyakarta', 'Surabaya'],
+                label: 'Kota/Kabupaten',
+                onChanged: onCityChanged,
+                value: city,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: AuthDropdownField(
+                hintText: 'Pilih...',
+                items: const ['Mlati', 'Berbah', 'Depok', 'Gamping'],
+                label: 'Kecamatan/Distrik',
+                onChanged: onDistrictChanged,
+                value: district,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        AuthTextField(
+          controller: addressController,
+          label: 'Alamat Lengkap',
+          hintText: 'Masukan alamat usaha',
         ),
         const SizedBox(height: 32),
         AppButton(

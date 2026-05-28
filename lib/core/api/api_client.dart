@@ -94,7 +94,7 @@ class ApiClient {
           return detail;
         }
         if (detail is List && detail.isNotEmpty) {
-          return detail.first.toString();
+          return detail.map(_formatErrorDetail).join('\n');
         }
       }
     } catch (_) {
@@ -102,5 +102,16 @@ class ApiClient {
     }
 
     return body;
+  }
+
+  String _formatErrorDetail(Object? detail) {
+    if (detail is Map) {
+      final message = detail['msg'] ?? detail['message'] ?? detail['detail'];
+      if (message != null) {
+        return message.toString();
+      }
+    }
+
+    return detail.toString();
   }
 }

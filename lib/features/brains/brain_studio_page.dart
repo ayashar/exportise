@@ -161,7 +161,7 @@ class _BrainStudioPageState extends State<BrainStudioPage> {
           .firstOrNull;
     }
 
-    activeSession ??= sessions.isNotEmpty ? sessions.first : null;
+    activeSession ??= _defaultSessionForMode(sessions);
 
     activeSession ??= await _createSessionInternal();
 
@@ -180,6 +180,24 @@ class _BrainStudioPageState extends State<BrainStudioPage> {
     setState(() {
       _brainFuture = _loadData();
     });
+  }
+
+  ChatSession? _defaultSessionForMode(List<ChatSession> sessions) {
+    if (sessions.isEmpty) {
+      return null;
+    }
+
+    final preferred = sessions.where((session) {
+      if (widget.mode == ChatbotMode.designReference) {
+        return session.productId == 12 ||
+            session.title.toLowerCase().contains('tas');
+      }
+
+      return session.productId == 13 ||
+          session.title.toLowerCase().contains('eco');
+    }).firstOrNull;
+
+    return preferred ?? sessions.first;
   }
 
   Future<void> _selectSession(ChatSession session) async {
@@ -456,7 +474,11 @@ class _MessageList extends StatelessWidget {
             (message) => Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: message.role == 'assistant'
-                  ? _AiMessage(text: message.content)
+                  ? _AiMessage(
+                      attachmentTitle: message.attachmentTitle,
+                      imageUrl: message.imageUrl,
+                      text: message.content,
+                    )
                   : _UserMessage(text: message.content),
             ),
           )
@@ -485,8 +507,10 @@ class _EmptyChatState extends StatelessWidget {
 }
 
 class _AiMessage extends StatelessWidget {
-  const _AiMessage({required this.text});
+  const _AiMessage({required this.text, this.attachmentTitle, this.imageUrl});
 
+  final String? attachmentTitle;
+  final String? imageUrl;
   final String text;
 
   @override
@@ -497,10 +521,22 @@ class _AiMessage extends StatelessWidget {
         const _BrainAvatar(),
         const SizedBox(width: 16),
         Expanded(
-          child: _MessageBubble(
-            text: text,
-            color: AppColors.system01,
-            borderColor: AppColors.neutral03,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _MessageBubble(
+                text: text,
+                color: AppColors.system01,
+                borderColor: AppColors.neutral03,
+              ),
+              if (imageUrl != null && imageUrl!.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _ChatAttachmentCard(
+                  imageUrl: imageUrl!,
+                  title: attachmentTitle ?? 'Referensi Desain',
+                ),
+              ],
+            ],
           ),
         ),
       ],
@@ -562,6 +598,99 @@ class _MessageBubble extends StatelessWidget {
           color: AppColors.neutral08,
           height: 1.45,
         ),
+      ),
+    );
+  }
+}
+
+class _ChatAttachmentCard extends StatelessWidget {
+  const _ChatAttachmentCard({required this.imageUrl, required this.title});
+
+  final String imageUrl;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final isNetwork = imageUrl.startsWith('http');
+
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: AppColors.system01,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.neutral03),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F7A5900),
+            blurRadius: 16,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AspectRatio(
+            aspectRatio: 1.25,
+            child: isNetwork
+                ? Image.network(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const _AttachmentFallback(),
+                  )
+                : Image.asset(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const _AttachmentFallback(),
+                  ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: AppTypography.bodyMd.copyWith(
+                      color: AppColors.neutral09,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                AppIcon(
+                  AppIcons.download(),
+                  color: AppColors.neutral08,
+                  dimension: 18,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Unduh',
+                  style: AppTypography.bodySm.copyWith(
+                    color: AppColors.neutral08,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AttachmentFallback extends StatelessWidget {
+  const _AttachmentFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.neutral03,
+      alignment: Alignment.center,
+      child: AppIcon(
+        AppIcons.package(),
+        color: AppColors.neutral07,
+        dimension: 36,
       ),
     );
   }

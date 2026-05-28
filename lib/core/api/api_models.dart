@@ -190,12 +190,16 @@ class ChatMessage {
     required this.id,
     required this.role,
     required this.sessionId,
+    this.attachmentTitle,
+    this.imageUrl,
     this.tokenCount,
   });
 
+  final String? attachmentTitle;
   final String content;
   final DateTime? createdAt;
   final int id;
+  final String? imageUrl;
   final String role;
   final int sessionId;
   final int? tokenCount;
@@ -205,6 +209,8 @@ class ChatMessage {
       content: _string(json, 'content'),
       createdAt: _dateTime(json, 'created_at'),
       id: _int(json, 'id'),
+      attachmentTitle: _nullableString(json, 'attachment_title'),
+      imageUrl: _nullableString(json, 'image_url'),
       role: _string(json, 'role'),
       sessionId: _int(json, 'session_id'),
       tokenCount: _nullableInt(json, 'token_count'),

@@ -497,11 +497,15 @@ class _ReferenceImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final currentImageUrl = imageUrl;
+    final isNetwork =
+        currentImageUrl != null && currentImageUrl.startsWith('http');
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: AspectRatio(
         aspectRatio: 1.2,
-        child: imageUrl == null || imageUrl!.isEmpty
+        child: currentImageUrl == null || currentImageUrl.isEmpty
             ? Container(
                 color: AppColors.neutral03,
                 alignment: Alignment.center,
@@ -511,21 +515,34 @@ class _ReferenceImage extends StatelessWidget {
                   dimension: 40,
                 ),
               )
-            : Image.network(
-                imageUrl!,
+            : isNetwork
+            ? Image.network(
+                currentImageUrl,
                 fit: BoxFit.cover,
-                errorBuilder: (_, _, _) {
-                  return Container(
-                    color: AppColors.neutral03,
-                    alignment: Alignment.center,
-                    child: AppIcon(
-                      AppIcons.package(),
-                      color: AppColors.neutral07,
-                      dimension: 40,
-                    ),
-                  );
-                },
+                errorBuilder: (_, _, _) => const _ReferenceImageFallback(),
+              )
+            : Image.asset(
+                currentImageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const _ReferenceImageFallback(),
               ),
+      ),
+    );
+  }
+}
+
+class _ReferenceImageFallback extends StatelessWidget {
+  const _ReferenceImageFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.neutral03,
+      alignment: Alignment.center,
+      child: AppIcon(
+        AppIcons.package(),
+        color: AppColors.neutral07,
+        dimension: 40,
       ),
     );
   }

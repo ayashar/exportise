@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/api_repository.dart';
@@ -52,7 +53,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
               const SizedBox(height: 10),
               Text(
-                'Eksportise siap membantumu\nmengembangkan usaha yang kamu miliki.',
+                'Exportise siap membantumu\nmengembangkan usaha yang kamu miliki.',
                 textAlign: TextAlign.center,
                 style: AppTypography.bodyMd.copyWith(
                   color: AppColors.neutral08,
@@ -166,7 +167,7 @@ class AuthBrand extends StatelessWidget {
         Image.asset(_logoAsset, width: 36, height: 36, fit: BoxFit.contain),
         const SizedBox(width: 8),
         Text(
-          'Eksportise',
+          'Exportise',
           style: AppTypography.headlineMd.copyWith(color: AppColors.primary05),
         ),
       ],
@@ -230,12 +231,14 @@ class AuthTextField extends StatefulWidget {
     required this.hintText,
     required this.label,
     this.controller,
+    this.inputFormatters,
     this.keyboardType,
     this.obscureText = false,
   });
 
   final TextEditingController? controller;
   final String hintText;
+  final List<TextInputFormatter>? inputFormatters;
   final TextInputType? keyboardType;
   final String label;
   final bool obscureText;
@@ -262,6 +265,7 @@ class _AuthTextFieldState extends State<AuthTextField> {
         const SizedBox(height: 8),
         TextField(
           controller: widget.controller,
+          inputFormatters: widget.inputFormatters,
           obscureText: _isObscured,
           keyboardType: widget.keyboardType,
           style: AppTypography.bodySm.copyWith(color: AppColors.neutral08),
@@ -409,7 +413,7 @@ class AuthTerms extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      'Dengan mendaftar, Anda menyetujui Syarat &\nKetentuan serta Kebijakan Privasi Eksportise.',
+      'Dengan mendaftar, Anda menyetujui Syarat &\nKetentuan serta Kebijakan Privasi Exportise.',
       textAlign: TextAlign.center,
       style: AppTypography.bodySm.copyWith(
         color: AppColors.neutral07,

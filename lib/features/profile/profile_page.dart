@@ -171,9 +171,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           const SizedBox(height: 20),
                           _ProfileTextField(
                             label: 'Alamat Lengkap',
-                            value: user.phone.isEmpty
-                                ? 'Alamat belum tersedia'
-                                : user.phone,
+                            value: 'Jalan rindu, Sendadi, Jogoboyoo Limo',
                           ),
                         ],
                       ),

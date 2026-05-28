@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -66,11 +67,42 @@ class _SplashPageState extends State<SplashPage>
       body: AnimatedBuilder(
         animation: _controller,
         builder: (context, child) {
+          final progress = _controller.value;
+          final size = MediaQuery.sizeOf(context);
           return Stack(
             fit: StackFit.expand,
             children: [
-              CustomPaint(
-                painter: _SplashWavePainter(progress: _controller.value),
+              const ColoredBox(color: AppColors.neutral01),
+              Opacity(
+                opacity: progress < 0.16
+                    ? 1.0
+                    : _clamp01(1 - _phase(progress, 0.16, 0.30)),
+                child: const ColoredBox(color: AppColors.primary04),
+              ),
+              _SplashWaveAsset(
+                assetPath: 'assets/images/splash/wave-large.svg',
+                height: size.height,
+                opacity: _fadeInOut(progress, 0.10, 0.20, 0.30, 0.42),
+                top: _lerp(-18, 18, _phase(progress, 0.10, 0.42)),
+                width: size.width,
+              ),
+              _SplashWaveAsset(
+                assetPath: 'assets/images/splash/wave-medium.svg',
+                height: size.height * 0.78,
+                opacity: _fadeInOut(progress, 0.30, 0.40, 0.50, 0.64),
+                top: _lerp(112, 236, _phase(progress, 0.30, 0.64)),
+                width: size.width,
+              ),
+              _SplashWaveAsset(
+                assetPath: 'assets/images/splash/wave-small.svg',
+                height: size.height * 0.48,
+                opacity: _fadeInOut(progress, 0.52, 0.60, 0.68, 0.78),
+                top: _lerp(
+                  size.height * 0.52,
+                  size.height * 0.70,
+                  _phase(progress, 0.52, 0.78),
+                ),
+                width: size.width * 0.86,
               ),
               Center(
                 child: FadeTransition(
@@ -89,43 +121,38 @@ class _SplashPageState extends State<SplashPage>
   }
 }
 
-class _SplashWavePainter extends CustomPainter {
-  const _SplashWavePainter({required this.progress});
+class _SplashWaveAsset extends StatelessWidget {
+  const _SplashWaveAsset({
+    required this.assetPath,
+    required this.height,
+    required this.opacity,
+    required this.top,
+    required this.width,
+  });
 
-  final double progress;
+  final String assetPath;
+  final double height;
+  final double opacity;
+  final double top;
+  final double width;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = AppColors.primary04;
-
-    if (progress <= 0.12) {
-      canvas.drawRect(Offset.zero & size, paint);
-      return;
-    }
-
-    final t = ((progress - 0.12) / 0.56).clamp(0.0, 1.0);
-    final eased = Curves.easeInOutCubic.transform(t);
-    final radius = _lerp(size.longestSide * 1.08, size.width * 0.72, eased);
-    final center = Offset(
-      _lerp(size.width * 0.34, -size.width * 0.26, eased),
-      _lerp(size.height * 0.30, size.height * 0.98, eased),
-    );
-
-    final path = Path()
-      ..addOval(Rect.fromCircle(center: center, radius: radius))
-      ..addOval(
-        Rect.fromCircle(
-          center: Offset(center.dx + radius * 0.52, center.dy - radius * 0.10),
-          radius: radius * 0.66,
+  Widget build(BuildContext context) {
+    return Positioned(
+      left: 0,
+      top: top,
+      child: IgnorePointer(
+        child: Opacity(
+          opacity: _clamp01(opacity),
+          child: SvgPicture.asset(
+            assetPath,
+            width: width,
+            height: height,
+            fit: BoxFit.fill,
+          ),
         ),
-      );
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _SplashWavePainter oldDelegate) {
-    return oldDelegate.progress != progress;
+      ),
+    );
   }
 }
 
@@ -158,4 +185,37 @@ class _SplashLogo extends StatelessWidget {
 
 double _lerp(double begin, double end, double t) {
   return begin + (end - begin) * t;
+}
+
+double _phase(double value, double start, double end) {
+  if (value <= start) {
+    return 0;
+  }
+  if (value >= end) {
+    return 1;
+  }
+  return Curves.easeInOutCubic.transform((value - start) / (end - start));
+}
+
+double _clamp01(double value) {
+  return value.clamp(0.0, 1.0).toDouble();
+}
+
+double _fadeInOut(
+  double value,
+  double fadeInStart,
+  double fadeInEnd,
+  double fadeOutStart,
+  double fadeOutEnd,
+) {
+  if (value < fadeInStart || value > fadeOutEnd) {
+    return 0;
+  }
+  if (value <= fadeInEnd) {
+    return _phase(value, fadeInStart, fadeInEnd);
+  }
+  if (value < fadeOutStart) {
+    return 1;
+  }
+  return 1 - _phase(value, fadeOutStart, fadeOutEnd);
 }

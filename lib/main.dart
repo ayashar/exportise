@@ -25,7 +25,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Eksportise',
+      title: 'Exportise',
       theme: AppTheme.light,
       home: const SplashPage(),
     );
