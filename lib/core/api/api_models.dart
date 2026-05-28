@@ -7,24 +7,36 @@ class ApiUser {
     required this.id,
     required this.phone,
     required this.updatedAt,
+    this.address,
+    this.city,
+    this.district,
+    this.province,
   });
 
+  final String? address;
+  final String? city;
   final String companyName;
   final DateTime? createdAt;
+  final String? district;
   final String email;
   final String fullName;
   final int id;
   final String phone;
+  final String? province;
   final DateTime? updatedAt;
 
   factory ApiUser.fromJson(Map<String, dynamic> json) {
     return ApiUser(
+      address: _nullableString(json, 'address'),
+      city: _nullableString(json, 'city'),
       companyName: _string(json, 'company_name'),
       createdAt: _dateTime(json, 'created_at'),
+      district: _nullableString(json, 'district'),
       email: _string(json, 'email'),
       fullName: _string(json, 'full_name'),
       id: _int(json, 'id'),
       phone: _string(json, 'phone'),
+      province: _nullableString(json, 'province'),
       updatedAt: _dateTime(json, 'updated_at'),
     );
   }

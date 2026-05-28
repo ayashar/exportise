@@ -275,6 +275,10 @@ class _ExporterLevelCard extends StatelessWidget {
     final doneCount = products.where((product) => product.isDone).length;
     final pendingCount = products.length - doneCount;
     final progress = products.isEmpty ? 0.0 : doneCount / products.length;
+    final title = products.isEmpty ? 'Akun baru' : 'Progress Analisis';
+    final description = products.isEmpty
+        ? 'Belum ada produk yang dianalisis. Mulai dari analisis pertama untuk membuat laporan ekspor.'
+        : '$doneCount analisis selesai, $pendingCount masih diproses.';
 
     return Container(
       width: double.infinity,
@@ -297,7 +301,7 @@ class _ExporterLevelCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Progress Analisis',
+                  title,
                   style: AppTypography.bodySm.copyWith(
                     color: AppColors.neutral09,
                     fontWeight: FontWeight.w600,
@@ -327,7 +331,7 @@ class _ExporterLevelCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            '$doneCount analisis selesai, $pendingCount masih diproses.',
+            description,
             style: AppTypography.bodySm.copyWith(
               color: AppColors.neutral08,
               height: 1.2,
@@ -347,7 +351,7 @@ class _InsightCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final title = product == null
-        ? 'Belum ada analisis yang dibuat. Mulai dari form analisis sekarang.'
+        ? 'Mulai dari 0: buat analisis produk pertamamu.'
         : product!.isDone
         ? 'Analisis terakhir sudah siap. Buka detail untuk melihat report dan referensi desain.'
         : 'Analisis terakhir sedang diproses. Cek lagi sebentar lagi.';
@@ -694,14 +698,55 @@ class _EmptyProductsState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
       decoration: BoxDecoration(
         color: AppColors.system01,
         borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.neutral03),
       ),
-      child: Text(
-        'Belum ada data analisis. Coba buat analisis pertama dari tombol di atas.',
-        style: AppTypography.bodySm.copyWith(color: AppColors.neutral08),
+      child: Column(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.neutral02,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.secondary08),
+            ),
+            child: Center(
+              child: AppIcon(
+                AppIcons.document(),
+                color: AppColors.primary05,
+                dimension: 24,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Belum ada riwayat analisis',
+            textAlign: TextAlign.center,
+            style: AppTypography.bodyMd.copyWith(
+              color: AppColors.neutral09,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Hasil analisis, referensi desain, dan laporan ekspor akan muncul di sini setelah produk pertama dibuat.',
+            textAlign: TextAlign.center,
+            style: AppTypography.bodySm.copyWith(
+              color: AppColors.neutral08,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 18),
+          AppButton(
+            label: 'Analisis produk pertama',
+            size: AppButtonSize.sm,
+            onPressed: () => _openAnalysis(context),
+          ),
+        ],
       ),
     );
   }

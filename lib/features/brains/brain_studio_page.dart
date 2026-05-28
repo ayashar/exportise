@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/api_models.dart';
 import '../../core/api/api_repository.dart';
+import '../../core/api/app_session.dart';
 import '../../core/iconography/app_icons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -98,7 +99,11 @@ class _BrainStudioPageState extends State<BrainStudioPage> {
                             ),
                             const SizedBox(height: 20),
                             if (data.activeSession == null)
-                              const _EmptyChatState()
+                              _EmptyChatState(
+                                isCreatingSession: _isCreatingSession,
+                                mode: widget.mode,
+                                onCreateSession: _createNewSession,
+                              )
                             else
                               _MessageList(
                                 messages: data.messages,
@@ -163,7 +168,13 @@ class _BrainStudioPageState extends State<BrainStudioPage> {
 
     activeSession ??= _defaultSessionForMode(sessions);
 
-    activeSession ??= await _createSessionInternal();
+    if (activeSession == null) {
+      return _BrainData(
+        activeSession: null,
+        messages: const [],
+        sessions: sessions,
+      );
+    }
 
     final messages = await _repository.listMessages(activeSession.id);
     return _BrainData(
@@ -302,7 +313,7 @@ class _ChatHeader extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             onTap: () => _openProfile(context),
             child: Text(
-              'Arunika Tas',
+              AppSession.instance.displayName,
               style: AppTypography.headlineSm.copyWith(
                 color: AppColors.neutral09,
               ),
@@ -429,23 +440,29 @@ class _SessionRow extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: sessions
-                .map(
-                  (session) => Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: ChoiceChip(
-                      label: Text(session.title),
-                      selected: selectedSessionId == session.id,
-                      onSelected: (_) => onSelectSession(session),
+        if (sessions.isEmpty)
+          Text(
+            'Belum ada sesi chat.',
+            style: AppTypography.bodySm.copyWith(color: AppColors.neutral08),
+          )
+        else
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: sessions
+                  .map(
+                    (session) => Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: ChoiceChip(
+                        label: Text(session.title),
+                        selected: selectedSessionId == session.id,
+                        onSelected: (_) => onSelectSession(session),
+                      ),
                     ),
-                  ),
-                )
-                .toList(),
+                  )
+                  .toList(),
+            ),
           ),
-        ),
       ],
     );
   }
@@ -488,20 +505,87 @@ class _MessageList extends StatelessWidget {
 }
 
 class _EmptyChatState extends StatelessWidget {
-  const _EmptyChatState({this.mode = ChatbotMode.fresh});
+  const _EmptyChatState({
+    this.isCreatingSession = false,
+    this.mode = ChatbotMode.fresh,
+    this.onCreateSession,
+  });
 
+  final bool isCreatingSession;
   final ChatbotMode mode;
+  final VoidCallback? onCreateSession;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _AiMessage(
-          text: mode == ChatbotMode.designReference
-              ? 'Hai! Kirimkan detail modifikasi desain yang kamu inginkan.'
-              : 'Hai! Ceritakan produk dan target pasar yang ingin kamu kejar.',
-        ),
-      ],
+    final title = mode == ChatbotMode.designReference
+        ? 'Belum ada diskusi referensi desain'
+        : 'Belum ada sesi BrainStudio';
+    final body = mode == ChatbotMode.designReference
+        ? 'Sesi diskusi akan muncul setelah kamu membuka referensi desain dari hasil analisis.'
+        : 'Mulai sesi baru saat kamu ingin bertanya ide desain, warna, kemasan, atau target pasar.';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
+      decoration: BoxDecoration(
+        color: AppColors.system01,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.neutral03),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F7A5900),
+            blurRadius: 16,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.neutral02,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.secondary08),
+            ),
+            child: Center(
+              child: AppIcon(
+                AppIcons.brain(PhosphorIconsStyle.fill),
+                color: AppColors.primary05,
+                dimension: 24,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: AppTypography.bodyMd.copyWith(
+              color: AppColors.neutral09,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            body,
+            textAlign: TextAlign.center,
+            style: AppTypography.bodySm.copyWith(
+              color: AppColors.neutral08,
+              height: 1.35,
+            ),
+          ),
+          if (onCreateSession != null) ...[
+            const SizedBox(height: 18),
+            AppButton(
+              label: isCreatingSession ? 'Membuat sesi...' : 'Mulai sesi chat',
+              isLoading: isCreatingSession,
+              onPressed: isCreatingSession ? null : onCreateSession,
+              size: AppButtonSize.sm,
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -759,8 +843,11 @@ class _ChatComposer extends StatelessWidget {
             Expanded(
               child: TextField(
                 controller: controller,
-                decoration: const InputDecoration(
-                  hintText: 'Tanyakan ide desain...',
+                enabled: onSend != null,
+                decoration: InputDecoration(
+                  hintText: onSend == null
+                      ? 'Mulai sesi chat terlebih dahulu'
+                      : 'Tanyakan ide desain...',
                   border: InputBorder.none,
                 ),
               ),

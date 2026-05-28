@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/api_models.dart';
 import '../../core/api/api_repository.dart';
+import '../../core/api/app_session.dart';
 import '../../core/iconography/app_icons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -169,7 +170,7 @@ class _HistoryHeader extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             onTap: () => _openProfile(context),
             child: Text(
-              'Arunika Tas',
+              AppSession.instance.displayName,
               style: AppTypography.headlineSm.copyWith(
                 color: AppColors.neutral09,
               ),
@@ -308,11 +309,14 @@ class _ReferenceHistoryList extends StatelessWidget {
       children: [
         if (referenceProduct == null)
           const _EmptyHistoryCard(
-            message: 'Belum ada hasil analisis yang punya design reference.',
+            title: 'Belum ada referensi desain',
+            message:
+                'Referensi desain akan muncul setelah kamu membuat analisis produk pertama.',
           )
         else if (references.isEmpty)
           const _EmptyHistoryCard(
-            message: 'Analysis ini belum memiliki design reference.',
+            title: 'Referensi belum tersedia',
+            message: 'Analisis ini belum memiliki design reference.',
           )
         else
           ...references.map(
@@ -341,7 +345,9 @@ class _ResultHistoryList extends StatelessWidget {
       children: [
         if (products.isEmpty)
           const _EmptyHistoryCard(
-            message: 'Belum ada hasil analisis yang tersimpan.',
+            title: 'Belum ada laporan analisis',
+            message:
+                'Hasil analisis dan laporan ekspor akan tersimpan di sini setelah produk pertama dibuat.',
           )
         else
           ...products.map(
@@ -618,22 +624,70 @@ class _StatusLabel extends StatelessWidget {
 }
 
 class _EmptyHistoryCard extends StatelessWidget {
-  const _EmptyHistoryCard({required this.message});
+  const _EmptyHistoryCard({required this.message, required this.title});
 
   final String message;
+  final String title;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
       decoration: BoxDecoration(
         color: AppColors.system01,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.neutral03),
       ),
-      child: Text(
-        message,
-        style: AppTypography.bodySm.copyWith(color: AppColors.neutral08),
+      child: Column(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.neutral02,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.secondary08),
+            ),
+            child: Center(
+              child: AppIcon(
+                AppIcons.document(),
+                color: AppColors.primary05,
+                dimension: 24,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: AppTypography.bodyMd.copyWith(
+              color: AppColors.neutral09,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: AppTypography.bodySm.copyWith(
+              color: AppColors.neutral08,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 18),
+          AppButton(
+            label: 'Analisis produk pertama',
+            size: AppButtonSize.sm,
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (context) => const AnalysisInputPage(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

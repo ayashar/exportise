@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/api_models.dart';
 import '../../core/api/api_repository.dart';
+import '../../core/api/app_session.dart';
 import '../../core/iconography/app_icons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../shared/widgets/app_bottom_navigation.dart';
 import '../../shared/widgets/app_button.dart';
-import '../../shared/widgets/app_dropdown_field.dart';
 import '../brains/brain_studio_page.dart';
 import '../notifications/notification_page.dart';
 import '../profile/profile_page.dart';
@@ -25,28 +25,13 @@ class DesignReferencePage extends StatefulWidget {
 
 class _DesignReferencePageState extends State<DesignReferencePage> {
   final _repository = ApiRepository();
-  final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _imageUrlController = TextEditingController();
-  final _tagsController = TextEditingController();
 
   late Future<_DesignReferenceData> _dataFuture;
-  bool _isSubmitting = false;
-  String? _sortOrder;
 
   @override
   void initState() {
     super.initState();
     _dataFuture = _loadData();
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
-    _imageUrlController.dispose();
-    _tagsController.dispose();
-    super.dispose();
   }
 
   @override
@@ -79,48 +64,32 @@ class _DesignReferencePageState extends State<DesignReferencePage> {
                 }
 
                 return SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 28, 16, 120),
+                  padding: const EdgeInsets.fromLTRB(16, 28, 16, 124),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const _DesignHeader(),
-                      const SizedBox(height: 30),
-                      _DesignTitle(product: data.product),
-                      const SizedBox(height: 20),
-                      _CreateReferenceCard(
-                        descriptionController: _descriptionController,
-                        imageUrlController: _imageUrlController,
-                        isSubmitting: _isSubmitting,
-                        onCreate: () => _createReference(data.product.id),
-                        onSortOrderChanged: (value) =>
-                            setState(() => _sortOrder = value),
-                        sortOrderValue: _sortOrder,
-                        tagsController: _tagsController,
-                        titleController: _titleController,
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'Design References',
-                        style: AppTypography.bodyMd.copyWith(
-                          color: AppColors.primary05,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 28),
+                      _DesignTitle(product: data.product, onRefresh: _refresh),
+                      const SizedBox(height: 26),
                       if (data.references.isEmpty)
                         const _EmptyState()
                       else
                         Column(
-                          children: data.references
-                              .map(
-                                (reference) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 20),
-                                  child: _DesignReferenceCard(
-                                    reference: reference,
-                                  ),
+                          children: [
+                            for (
+                              var index = 0;
+                              index < data.references.length;
+                              index++
+                            )
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 26),
+                                child: _DesignReferenceCard(
+                                  isBest: index == 0,
+                                  reference: data.references[index],
                                 ),
-                              )
-                              .toList(),
+                              ),
+                          ],
                         ),
                     ],
                   ),
@@ -174,81 +143,6 @@ class _DesignReferencePageState extends State<DesignReferencePage> {
     });
   }
 
-  Future<void> _createReference(int analysProductId) async {
-    final title = _titleController.text.trim();
-    final description = _descriptionController.text.trim();
-    final imageUrl = _imageUrlController.text.trim();
-    final tags = _tagsController.text
-        .split(',')
-        .map((item) => item.trim())
-        .where((item) => item.isNotEmpty)
-        .toList();
-    final sortOrder = int.tryParse(_sortOrder ?? '') ?? 0;
-
-    if (title.isEmpty || description.isEmpty || imageUrl.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Title, deskripsi, dan image URL wajib diisi.'),
-        ),
-      );
-      return;
-    }
-
-    setState(() => _isSubmitting = true);
-
-    try {
-      await _repository.createDesignReference(
-        analysProductId: analysProductId,
-        description: description,
-        imageUrl: imageUrl,
-        sortOrder: sortOrder,
-        tags: tags,
-        title: title,
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Design reference berhasil ditambahkan.')),
-      );
-
-      _titleController.clear();
-      _descriptionController.clear();
-      _imageUrlController.clear();
-      _tagsController.clear();
-      setState(() => _sortOrder = null);
-      await _refresh();
-    } on ApiException catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            error.message.isEmpty
-                ? 'Gagal menambahkan design reference'
-                : error.message,
-          ),
-        ),
-      );
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gagal menambahkan design reference.')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
-    }
-  }
-
   String _errorMessage(Object? error) {
     if (error is ApiException) {
       return error.message;
@@ -278,7 +172,7 @@ class _DesignHeader extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             onTap: () => _openProfile(context),
             child: Text(
-              'Arunika Tas',
+              AppSession.instance.displayName,
               style: AppTypography.bodyMd.copyWith(
                 color: AppColors.neutral09,
                 fontWeight: FontWeight.w700,
@@ -324,169 +218,212 @@ void _openNotifications(BuildContext context) {
 }
 
 class _DesignTitle extends StatelessWidget {
-  const _DesignTitle({required this.product});
+  const _DesignTitle({required this.onRefresh, required this.product});
 
+  final VoidCallback onRefresh;
   final AnalysisProduct product;
 
   @override
   Widget build(BuildContext context) {
+    final market = _recommendedMarket(product);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        AppIcon(AppIcons.bag(), color: AppColors.neutral09, dimension: 24),
-        const SizedBox(width: 8),
         Expanded(
-          child: Column(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                product.productName,
-                style: AppTypography.headlineLg.copyWith(
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: AppIcon(
+                  AppIcons.bag(),
                   color: AppColors.neutral09,
-                  height: 1,
+                  dimension: 21,
                 ),
               ),
-              const SizedBox(height: 12),
-              Text(
-                product.category,
-                style: AppTypography.bodyMd.copyWith(
-                  color: AppColors.neutral08,
+              const SizedBox(width: 7),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      product.productName,
+                      style: AppTypography.headlineLg.copyWith(
+                        color: AppColors.neutral09,
+                        height: 1.05,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      market,
+                      style: AppTypography.bodyMd.copyWith(
+                        color: AppColors.neutral08,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
+        const SizedBox(width: 12),
+        AppButton(
+          label: 'Ulangi',
+          leadingIcon: AppIcons.refresh(),
+          size: AppButtonSize.sm,
+          variant: AppButtonVariant.outline,
+          onPressed: onRefresh,
+        ),
       ],
     );
   }
-}
 
-class _CreateReferenceCard extends StatelessWidget {
-  const _CreateReferenceCard({
-    required this.descriptionController,
-    required this.imageUrlController,
-    required this.isSubmitting,
-    required this.onCreate,
-    required this.onSortOrderChanged,
-    required this.sortOrderValue,
-    required this.tagsController,
-    required this.titleController,
-  });
+  String _recommendedMarket(AnalysisProduct product) {
+    final summary = product.summary;
+    final market = summary?['recommended_market'];
+    if (market is Map) {
+      final primary = market['primary'];
+      if (primary != null && primary.toString().isNotEmpty) {
+        return primary.toString();
+      }
+    }
 
-  final TextEditingController descriptionController;
-  final TextEditingController imageUrlController;
-  final bool isSubmitting;
-  final VoidCallback onCreate;
-  final ValueChanged<String?> onSortOrderChanged;
-  final String? sortOrderValue;
-  final TextEditingController tagsController;
-  final TextEditingController titleController;
-
-  @override
-  Widget build(BuildContext context) {
-    return _CardShell(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Tambah Design Reference',
-            style: AppTypography.bodyMd.copyWith(
-              color: AppColors.neutral09,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 14),
-          _LabeledTextField(
-            label: 'Title',
-            controller: titleController,
-            hintText: 'Soft Minimal Knit',
-          ),
-          const SizedBox(height: 12),
-          _LabeledTextField(
-            label: 'Description',
-            controller: descriptionController,
-            hintText: 'Deskripsi referensi desain',
-            maxLines: 3,
-          ),
-          const SizedBox(height: 12),
-          _LabeledTextField(
-            label: 'Image URL',
-            controller: imageUrlController,
-            hintText: 'https://...',
-          ),
-          const SizedBox(height: 12),
-          _LabeledTextField(
-            label: 'Tags',
-            controller: tagsController,
-            hintText: 'cream, minimal, soft texture',
-          ),
-          const SizedBox(height: 12),
-          AppDropdownField(
-            hintText: 'Sort Order',
-            items: const ['0', '1', '2', '3'],
-            onChanged: onSortOrderChanged,
-            value: sortOrderValue,
-            textStyle: AppTypography.bodySm.copyWith(
-              color: AppColors.neutral09,
-            ),
-          ),
-          const SizedBox(height: 16),
-          AppButton(
-            label: 'Simpan Reference',
-            isLoading: isSubmitting,
-            isFullWidth: true,
-            onPressed: isSubmitting ? null : onCreate,
-          ),
-        ],
-      ),
-    );
+    return product.category;
   }
 }
 
 class _DesignReferenceCard extends StatelessWidget {
-  const _DesignReferenceCard({required this.reference});
+  const _DesignReferenceCard({required this.isBest, required this.reference});
 
+  final bool isBest;
   final DesignReference reference;
 
   @override
   Widget build(BuildContext context) {
-    return _CardShell(
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: AppColors.system01,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x127A5900),
+            blurRadius: 24,
+            offset: Offset(0, 12),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _ReferenceImage(imageUrl: reference.imageUrl),
-          const SizedBox(height: 18),
-          Text(
-            reference.title,
-            style: AppTypography.headlineSm.copyWith(
-              color: AppColors.neutral09,
-            ),
+          Stack(
+            children: [
+              _ReferenceImage(imageUrl: reference.imageUrl),
+              if (isBest)
+                Positioned(
+                  top: 14,
+                  right: 14,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondary04,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Text(
+                      'Rekomendasi Terbaik',
+                      style: AppTypography.bodySm.copyWith(
+                        color: AppColors.primary08,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            reference.description,
-            style: AppTypography.bodyMd.copyWith(
-              color: AppColors.neutral08,
-              height: 1.35,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _formattedTitle(reference.title),
+                  style: AppTypography.headlineSm.copyWith(
+                    color: AppColors.neutral09,
+                    height: 1.08,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  reference.description,
+                  style: AppTypography.bodyMd.copyWith(
+                    color: AppColors.neutral08,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                Text(
+                  'Rekomendasi Elemen',
+                  style: AppTypography.bodyMd.copyWith(
+                    color: AppColors.primary05,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: reference.tags.map((tag) => _Tag(tag)).toList(),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: AppButton(
+                        label: 'Unduh',
+                        leadingIcon: AppIcons.download(),
+                        size: AppButtonSize.sm,
+                        variant: AppButtonVariant.ghost,
+                        onPressed: () {},
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: AppButton(
+                        label: 'Diskusi',
+                        leadingIcon: AppIcons.chat(),
+                        size: AppButtonSize.sm,
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (context) =>
+                                  const BrainStudioPage.designReference(),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            'Tags',
-            style: AppTypography.bodyMd.copyWith(
-              color: AppColors.primary05,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: reference.tags.map((tag) => _Tag(tag)).toList(),
           ),
         ],
       ),
     );
+  }
+
+  String _formattedTitle(String title) {
+    final parts = title.split(' ');
+    if (parts.length <= 2) {
+      return title;
+    }
+
+    return '${parts.take(2).join(' ')}\n${parts.skip(2).join(' ')}';
   }
 }
 
@@ -502,9 +439,8 @@ class _ReferenceImage extends StatelessWidget {
         currentImageUrl != null && currentImageUrl.startsWith('http');
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
       child: AspectRatio(
-        aspectRatio: 1.2,
+        aspectRatio: 1.0,
         child: currentImageUrl == null || currentImageUrl.isEmpty
             ? Container(
                 color: AppColors.neutral03,
@@ -548,31 +484,6 @@ class _ReferenceImageFallback extends StatelessWidget {
   }
 }
 
-class _CardShell extends StatelessWidget {
-  const _CardShell({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: AppColors.system01,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x127A5900),
-            blurRadius: 24,
-            offset: Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Padding(padding: const EdgeInsets.all(20), child: child),
-    );
-  }
-}
-
 class _Tag extends StatelessWidget {
   const _Tag(this.label);
 
@@ -599,60 +510,21 @@ class _Tag extends StatelessWidget {
   }
 }
 
-class _LabeledTextField extends StatelessWidget {
-  const _LabeledTextField({
-    required this.controller,
-    required this.hintText,
-    required this.label,
-    this.maxLines = 1,
-  });
-
-  final TextEditingController controller;
-  final String hintText;
-  final String label;
-  final int maxLines;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: AppTypography.bodySm.copyWith(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          maxLines: maxLines,
-          decoration: InputDecoration(
-            hintText: hintText,
-            filled: true,
-            fillColor: AppColors.tertiary05,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: AppColors.tertiary06),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: AppColors.primary04),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
 
   @override
   Widget build(BuildContext context) {
-    return _CardShell(
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.system01,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.neutral03),
+      ),
       child: Text(
-        'Belum ada design reference. Tambahkan satu dari form di atas.',
+        'Belum ada rekomendasi desain. Jalankan analisis produk terlebih dahulu.',
         style: AppTypography.bodySm.copyWith(color: AppColors.neutral08),
       ),
     );

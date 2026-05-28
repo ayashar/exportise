@@ -28,9 +28,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
   bool _isEditing = false;
   bool _isLoggingOut = false;
-  String _city = 'Sleman';
-  String _district = 'Mlati';
-  String _province = 'DI Yogyakarta';
+  String? _city;
+  String? _district;
+  String? _province;
 
   @override
   void initState() {
@@ -115,7 +115,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           const SizedBox(height: 20),
                           _ProfileDropdownField(
                             label: 'Provinsi',
-                            value: _province,
+                            value: _province ?? user.province,
                             items: const [
                               'DI Yogyakarta',
                               'Jawa Timur',
@@ -134,7 +134,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               Expanded(
                                 child: _ProfileDropdownField(
                                   label: 'Kota/Kabupaten',
-                                  value: _city,
+                                  value: _city ?? user.city,
                                   items: const [
                                     'Sleman',
                                     'Bantul',
@@ -152,7 +152,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               Expanded(
                                 child: _ProfileDropdownField(
                                   label: 'Kecamatan',
-                                  value: _district,
+                                  value: _district ?? user.district,
                                   items: const [
                                     'Mlati',
                                     'Berbah',
@@ -171,7 +171,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           const SizedBox(height: 20),
                           _ProfileTextField(
                             label: 'Alamat Lengkap',
-                            value: 'Jalan rindu, Sendadi, Jogoboyoo Limo',
+                            value: user.address ?? 'Belum diisi',
                           ),
                         ],
                       ),
@@ -317,7 +317,7 @@ class _ProfileDropdownField extends StatelessWidget {
   final List<String> items;
   final String label;
   final ValueChanged<String?> onChanged;
-  final String value;
+  final String? value;
 
   @override
   Widget build(BuildContext context) {

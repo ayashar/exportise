@@ -12,6 +12,15 @@ class AppSession extends ChangeNotifier {
 
   bool get isAuthenticated => tokens != null;
 
+  String get displayName {
+    final user = currentUser;
+    if (user == null) {
+      return 'Exportise';
+    }
+
+    return user.companyName.isEmpty ? user.fullName : user.companyName;
+  }
+
   Map<String, String> get authHeaders {
     final accessToken = tokens?.accessToken;
     if (accessToken == null || accessToken.isEmpty) {

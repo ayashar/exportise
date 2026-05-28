@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/download/asset_downloader.dart';
+import '../../core/api/app_session.dart';
 import '../../core/iconography/app_icons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -27,16 +27,9 @@ class NotificationPage extends StatelessWidget {
                 children: const [
                   _NotificationHeader(),
                   SizedBox(height: 38),
-                  _NotificationSectionHeader(
-                    title: 'Hari ini',
-                    actionLabel: 'Tandai semua sudah di baca',
-                  ),
+                  _NotificationSectionHeader(title: 'Notifikasi'),
                   SizedBox(height: 18),
-                  _ReportNotificationCard(),
-                  SizedBox(height: 36),
-                  _NotificationSectionHeader(title: 'Kemarin'),
-                  SizedBox(height: 18),
-                  _ReportNotificationCard(),
+                  _EmptyNotificationCard(),
                 ],
               ),
             ),
@@ -112,7 +105,7 @@ class _NotificationHeader extends StatelessWidget {
               );
             },
             child: Text(
-              'Arunika Tas',
+              AppSession.instance.displayName,
               style: AppTypography.headlineSm.copyWith(
                 color: AppColors.neutral09,
               ),
@@ -125,9 +118,8 @@ class _NotificationHeader extends StatelessWidget {
 }
 
 class _NotificationSectionHeader extends StatelessWidget {
-  const _NotificationSectionHeader({required this.title, this.actionLabel});
+  const _NotificationSectionHeader({required this.title});
 
-  final String? actionLabel;
   final String title;
 
   @override
@@ -143,18 +135,13 @@ class _NotificationSectionHeader extends StatelessWidget {
             ),
           ),
         ),
-        if (actionLabel != null)
-          Text(
-            actionLabel!,
-            style: AppTypography.bodySm.copyWith(color: AppColors.primary05),
-          ),
       ],
     );
   }
 }
 
-class _ReportNotificationCard extends StatelessWidget {
-  const _ReportNotificationCard();
+class _EmptyNotificationCard extends StatelessWidget {
+  const _EmptyNotificationCard();
 
   @override
   Widget build(BuildContext context) {
@@ -174,111 +161,41 @@ class _ReportNotificationCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppColors.primary04,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Center(
-                  child: AppIcon(
-                    AppIcons.filePdf(),
-                    color: AppColors.primary08,
-                    dimension: 24,
-                  ),
-                ),
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.primary04,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Center(
+              child: AppIcon(
+                AppIcons.bell(),
+                color: AppColors.primary08,
+                dimension: 24,
               ),
-              const SizedBox(width: 18),
-              Expanded(
-                child: Text(
-                  'Laporan Tas Anyaman\nAmerika Serikat',
-                  style: AppTypography.headlineSm.copyWith(
-                    color: AppColors.neutral08,
-                    height: 1.45,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-          const SizedBox(height: 18),
-          Align(alignment: Alignment.centerRight, child: _DownloadPdfButton()),
+          const SizedBox(height: 16),
+          Text(
+            'Belum ada notifikasi',
+            textAlign: TextAlign.center,
+            style: AppTypography.headlineSm.copyWith(
+              color: AppColors.neutral08,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Aktivitas analisis, laporan, dan pembaruan akun akan muncul di sini.',
+            textAlign: TextAlign.center,
+            style: AppTypography.bodySm.copyWith(
+              color: AppColors.neutral08,
+              height: 1.35,
+            ),
+          ),
         ],
       ),
     );
-  }
-}
-
-class _DownloadPdfButton extends StatefulWidget {
-  @override
-  State<_DownloadPdfButton> createState() => _DownloadPdfButtonState();
-}
-
-class _DownloadPdfButtonState extends State<_DownloadPdfButton> {
-  bool _isDownloading = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextButton.icon(
-      onPressed: _isDownloading ? null : _download,
-      style: TextButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: AppColors.primary02),
-        ),
-        backgroundColor: AppColors.neutral01,
-      ),
-      label: Text(
-        _isDownloading ? 'Mengunduh...' : 'Unduh PDF',
-        style: AppTypography.bodyMd.copyWith(
-          color: AppColors.neutral08,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-      icon: AppIcon(
-        AppIcons.download(),
-        color: AppColors.neutral08,
-        dimension: 18,
-      ),
-    );
-  }
-
-  Future<void> _download() async {
-    setState(() => _isDownloading = true);
-
-    try {
-      final result = await downloadAsset(
-        assetPath: 'assets/reports/laporan_tas_anyaman_amerika_serikat.pdf',
-        fileName: 'laporan-tas-anyaman-amerika-serikat.pdf',
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      final message = result.path == null
-          ? '${result.fileName} sedang diunduh.'
-          : '${result.fileName} tersimpan di ${result.path}.';
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unduhan PDF belum berhasil. Coba lagi.')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isDownloading = false);
-      }
-    }
   }
 }

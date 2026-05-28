@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/api_models.dart';
 import '../../core/api/api_repository.dart';
+import '../../core/api/app_session.dart';
 import '../../core/iconography/app_icons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -352,7 +353,7 @@ class _ResultHeader extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             onTap: () => _openProfile(context),
             child: Text(
-              'Arunika Tas',
+              AppSession.instance.displayName,
               style: AppTypography.bodyMd.copyWith(
                 color: AppColors.neutral09,
                 fontWeight: FontWeight.w700,

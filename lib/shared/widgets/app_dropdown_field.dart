@@ -46,7 +46,7 @@ class _AppDropdownFieldState extends State<AppDropdownField> {
 
   @override
   void dispose() {
-    _removeOverlay();
+    _removeOverlay(notify: false);
     super.dispose();
   }
 
@@ -105,10 +105,15 @@ class _AppDropdownFieldState extends State<AppDropdownField> {
     setState(() {});
   }
 
-  void _removeOverlay() {
-    _overlayEntry?.remove();
+  void _removeOverlay({bool notify = true}) {
+    final overlayEntry = _overlayEntry;
+    if (overlayEntry == null) {
+      return;
+    }
+
+    overlayEntry.remove();
     _overlayEntry = null;
-    if (mounted) {
+    if (notify && mounted) {
       setState(() {});
     }
   }
